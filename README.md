@@ -6,14 +6,14 @@ A personal replacement for [Couleurs](https://couleursapp.com/), inspired by its
 
 ## Everyday use
 
-The app opens as a **260 px floating window**: a swatch, eyedropper, color code, format menu, and six recent colors.
+The app opens as a **272 px floating window**: an inset swatch, eyedropper, color code, format menu, and six recent colors. Native materials follow your Mac’s appearance.
 
 - **Press the swatch or eyedropper, hold, drag anywhere on screen, and release** to save and copy the color.
 - Alternatively, click the eyedropper, then click a color, or press **⌃⌥C** from any app.
 - **Hold Shift when selecting** to keep the sampler open and collect more colors. Release Shift for the final selection, or press **Esc** to finish. Each selected color gets its own history entry; the latest is copied.
 - **Click the color code** to copy it again. Click a recent swatch to select and copy it.
-- Use the **chevron menu** to change the copy format or toggle keeping the window on top.
-- The **expand button in the title bar** opens the full library. **Compact picker** in the library returns to the small window.
+- Use the **format menu** beside the code to change its encoding. The **pin in the title bar** toggles keeping the window on top.
+- The **expand button in the title bar** opens the full library. The **Compact Picker** toolbar button (or **⌘2**) returns to the small window.
 
 Automatic copying and keeping the picker on top are enabled initially. The floating window can accompany other apps and full-screen Spaces. The title bar remains available for moving it.
 
@@ -24,6 +24,8 @@ Every pick is saved immediately and kept across app restarts, with no history li
 - Give colors names, mark favorites, and organize them into named collections.
 - Search by name, HEX, app, window title, source URL, collection, or notes.
 - Sort by time, name, or hue.
+- Double-click a library swatch to copy it. Select a swatch and use the arrow keys to browse.
+- Use **⌘F** for toolbar search. Resize or hide the native sidebar and inspector to make more room for colors.
 - Adjust a saved color with the native color panel, including opacity.
 - See the pick time, source app and bundle ID, display, and screen coordinates.
 - Add notes and a source URL by hand.

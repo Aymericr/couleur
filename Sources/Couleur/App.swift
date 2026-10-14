@@ -25,7 +25,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var store: ColorStore!
     private var picker: ScreenPicker!
     private var libraryWindow: NSWindow!
+    private var libraryController: LibraryWindowController!
     private var floatingPanel: FloatingPanel!
+    private var pinButton: NSButton!
     private var statusItem: NSStatusItem!
     private var hotKey: HotKey?
     private var restoreLibrary = false
@@ -60,16 +62,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func makeWindows() {
-        libraryWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1050, height: 720), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        libraryWindow.title = "Couleur"
-        libraryWindow.minSize = NSSize(width: 960, height: 620)
-        libraryWindow.isReleasedWhenClosed = false
+        libraryController = LibraryWindowController(store: store,
+            pick: { [weak self] in self?.pickColor() }, compact: { [weak self] in self?.showFloating() })
+        libraryWindow = libraryController.window
         libraryWindow.delegate = self
-        libraryWindow.contentView = NSHostingView(rootView: LibraryView(store: store, pick: { [weak self] in self?.pickColor() }, showFloating: { [weak self] in self?.showFloating() }))
-        libraryWindow.center()
-        libraryWindow.setFrameAutosaveName("CouleurLibrary")
 
-        floatingPanel = FloatingPanel(contentRect: NSRect(x: 0, y: 0, width: 260, height: 215), styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel], backing: .buffered, defer: false)
+        floatingPanel = FloatingPanel(contentRect: NSRect(origin: .zero, size: FloatingView.size), styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel], backing: .buffered, defer: false)
         floatingPanel.title = "Couleur"
         floatingPanel.isFloatingPanel = true
         floatingPanel.hidesOnDeactivate = false
@@ -81,27 +79,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         floatingPanel.delegate = self
         let accessory = NSTitlebarAccessoryViewController()
         accessory.layoutAttribute = .right
+        let controls = NSView(frame: NSRect(x: 0, y: 0, width: 53, height: 24))
+        pinButton = NSButton(image: NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "Keep on top")!, target: self, action: #selector(togglePin))
+        pinButton.bezelStyle = .inline
+        pinButton.isBordered = false
+        pinButton.frame = NSRect(x: 0, y: 0, width: 24, height: 24)
+        pinButton.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 10, weight: .regular)
+        controls.addSubview(pinButton)
         let expand = NSButton(image: NSImage(systemSymbolName: "arrow.up.left.and.arrow.down.right", accessibilityDescription: "Expand library")!, target: self, action: #selector(showLibrary))
         expand.bezelStyle = .inline
         expand.isBordered = false
-        expand.frame = NSRect(x: 0, y: 0, width: 28, height: 24)
+        expand.frame = NSRect(x: 25, y: 0, width: 26, height: 24)
+        expand.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 11, weight: .regular)
         expand.toolTip = "Expand library · ⌘1"
-        accessory.view = expand
+        controls.addSubview(expand)
+        accessory.view = controls
         floatingPanel.addTitlebarAccessoryViewController(accessory)
         updateFloatingPanel()
         floatingPanel.center()
         floatingPanel.setFrameAutosaveName("CouleurPicker")
-        floatingPanel.setContentSize(NSSize(width: 260, height: 215))
+        floatingPanel.setContentSize(FloatingView.size)
     }
 
     private func updateFloatingPanel() {
         floatingPanel.level = pinned ? .floating : .normal
+        pinButton.image = NSImage(systemSymbolName: pinned ? "pin.fill" : "pin", accessibilityDescription: "Keep on top")
+        pinButton.contentTintColor = pinned ? .secondaryLabelColor : .tertiaryLabelColor
+        pinButton.toolTip = pinned ? "Keep on top is on" : "Keep on top is off"
+        pinButton.setAccessibilityValue(pinned ? "On" : "Off")
         floatingPanel.contentView = NSHostingView(rootView: FloatingView(store: store,
-            pick: { [weak self] in self?.picker.pick(initiatedByPress: true) }, showLibrary: { [weak self] in self?.showLibrary() },
-            togglePin: { [weak self] in
-                guard let self else { return }; self.pinned.toggle(); self.updateFloatingPanel()
-            }, isPinned: pinned))
+            pick: { [weak self] in self?.picker.pick(initiatedByPress: true) }, showLibrary: { [weak self] in self?.showLibrary() }))
     }
+
+    @objc private func togglePin() { pinned.toggle(); updateFloatingPanel() }
+    @objc private func findColors() { showLibrary(); libraryController.focusSearch() }
 
     @objc private func showLibrary() {
         floatingPanel?.orderOut(nil)
@@ -156,6 +167,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         for (title, action, key) in [("Undo", Selector(("undo:")), "z"), ("Cut", #selector(NSText.cut(_:)), "x"), ("Copy", #selector(NSText.copy(_:)), "c"), ("Paste", #selector(NSText.paste(_:)), "v"), ("Select All", #selector(NSText.selectAll(_:)), "a")] {
             edit.addItem(NSMenuItem(title: title, action: action, keyEquivalent: key))
         }
+        edit.addItem(.separator())
+        edit.addItem(item("Find Colors", #selector(findColors), key: "f"))
         let editRoot = NSMenuItem(); editRoot.submenu = edit; main.addItem(editRoot)
 
         let window = NSMenu(title: "Window")
