@@ -4,7 +4,8 @@ import SwiftUI
 
 /// AppKit owns window chrome, toolbar search, split resizing, and sidebar materials.
 @MainActor
-final class LibraryWindowController: NSWindowController, NSToolbarDelegate, NSSearchFieldDelegate, NSMenuDelegate {
+final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegate, NSMenuDelegate {
+    private weak var window: NSWindow?
     private let store: ColorStore
     private let pick: () -> Void
     private let compact: () -> Void
@@ -12,19 +13,13 @@ final class LibraryWindowController: NSWindowController, NSToolbarDelegate, NSSe
     private var inspector: NSSplitViewItem!
     private var observations: Set<AnyCancellable> = []
     private let searchItem = NSSearchToolbarItem(itemIdentifier: .colorSearch)
+    private let libraryToolbar = NSToolbar(identifier: "CouleurLibraryToolbar")
     private var pickItem: NSToolbarItem?
 
-    init(store: ColorStore, pick: @escaping () -> Void, compact: @escaping () -> Void) {
+    init(window: NSWindow, store: ColorStore, pick: @escaping () -> Void, compact: @escaping () -> Void) {
         self.store = store; self.pick = pick; self.compact = compact
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 700),
-                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-                              backing: .buffered, defer: false)
-        super.init(window: window)
-        window.title = "All Colors"
-        window.minSize = NSSize(width: 760, height: 560)
-        window.isReleasedWhenClosed = false
-        window.toolbarStyle = .unified
-        window.titlebarSeparatorStyle = .none
+        self.window = window
+        super.init()
 
         let sidebar = NSSplitViewItem(sidebarWithViewController: NSHostingController(rootView: LibrarySidebar(store: store)))
         sidebar.minimumThickness = 175
@@ -43,15 +38,9 @@ final class LibraryWindowController: NSWindowController, NSToolbarDelegate, NSSe
         split.addSplitViewItem(sidebar)
         split.addSplitViewItem(content)
         split.addSplitViewItem(inspector)
-        window.contentViewController = split
-
-        let toolbar = NSToolbar(identifier: "CouleurLibraryToolbar")
-        toolbar.delegate = self
-        toolbar.displayMode = .iconOnly
-        toolbar.allowsUserCustomization = false
-        window.toolbar = toolbar
-        window.center()
-        window.setFrameAutosaveName("CouleurLibrary")
+        libraryToolbar.delegate = self
+        libraryToolbar.displayMode = .iconOnly
+        libraryToolbar.allowsUserCustomization = false
 
         store.objectWillChange.sink { [weak self] in
             // Published sends before the mutation; refresh chrome after the values settle.
@@ -60,7 +49,18 @@ final class LibraryWindowController: NSWindowController, NSToolbarDelegate, NSSe
         refreshChrome()
     }
 
-    required init?(coder: NSCoder) { fatalError("Use init(store:pick:compact:)") }
+    func install() {
+        guard let window else { return }
+        // NSWindow adopts a controller's existing view size on assignment.
+        // Prepare it at the final size so installing the split does not snap
+        // the just-expanded window back to the split's minimum dimensions.
+        split.view.frame = NSRect(origin: .zero, size: window.contentView?.bounds.size ?? window.frame.size)
+        window.contentViewController = split
+        window.toolbarStyle = .unified
+        window.titlebarSeparatorStyle = .none
+        window.toolbar = libraryToolbar
+        refreshChrome()
+    }
 
     func focusSearch() {
         searchItem.beginSearchInteraction()
@@ -68,7 +68,9 @@ final class LibraryWindowController: NSWindowController, NSToolbarDelegate, NSSe
     }
 
     private func refreshChrome() {
-        window?.title = store.filter == .all ? "All Colors" : store.filterTitle
+        if window?.contentViewController === split {
+            window?.title = store.filter == .all ? "All Colors" : store.filterTitle
+        }
         if searchItem.searchField.stringValue != store.search { searchItem.searchField.stringValue = store.search }
         pickItem?.isEnabled = !store.isSampling && !store.readOnly
     }
@@ -100,6 +102,7 @@ final class LibraryWindowController: NSWindowController, NSToolbarDelegate, NSSe
         case .colorCompact:
             let item = button(id, "Compact Picker", symbol: "arrow.down.right.and.arrow.up.left", action: #selector(showCompact))
             item.toolTip = "Return to compact picker · ⌘2"
+            item.visibilityPriority = .high
             return item
         case .colorInspector:
             return button(id, "Toggle Inspector", symbol: "sidebar.right", action: #selector(toggleInspector))

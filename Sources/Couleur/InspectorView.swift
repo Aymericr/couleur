@@ -86,7 +86,7 @@ struct InspectorView: View {
                     Text(record.value.formatted(store.copyFormat))
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
-                    Image(systemName: store.message?.hasPrefix("Copied") == true ? "checkmark" : "doc.on.doc")
+                    Image(systemName: store.copiedColorID == record.id ? "checkmark" : "doc.on.doc")
                         .font(.system(size: 12)).foregroundStyle(.secondary).frame(width: 14)
                 }.padding(11)
                     .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 7))

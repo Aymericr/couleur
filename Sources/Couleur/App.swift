@@ -1,6 +1,4 @@
 import AppKit
-import CouleurCore
-import SwiftUI
 
 @main
 @MainActor
@@ -15,125 +13,63 @@ enum CouleurApp {
 }
 
 @MainActor
-final class FloatingPanel: NSPanel {
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { false }
-}
-
-@MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var store: ColorStore!
     private var picker: ScreenPicker!
-    private var libraryWindow: NSWindow!
-    private var libraryController: LibraryWindowController!
-    private var floatingPanel: FloatingPanel!
-    private var pinButton: NSButton!
+    private var palette: PaletteWindowController!
     private var statusItem: NSStatusItem!
     private var hotKey: HotKey?
-    private var restoreLibrary = false
-    private var restorePanel = false
-    private var pinned: Bool {
-        get { UserDefaults.standard.object(forKey: "pinned") as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: "pinned") }
-    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let arguments = ProcessInfo.processInfo.arguments
-        let directory: URL? = if let index = arguments.firstIndex(of: "--data-directory"), arguments.indices.contains(index + 1) {
+        var directory: URL? = if let index = arguments.firstIndex(of: "--data-directory"), arguments.indices.contains(index + 1) {
             URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
         } else { nil }
+        var isPreview = false
+        #if DEBUG
+        if Bundle.main.bundleIdentifier == "com.aymeric.couleur.preview",
+           let path = Bundle.main.object(forInfoDictionaryKey: "CouleurPreviewDirectory") as? String {
+            directory = URL(fileURLWithPath: path, isDirectory: true)
+            isPreview = true
+            if let appearance = Bundle.main.object(forInfoDictionaryKey: "CouleurPreviewAppearance") as? String {
+                NSApp.appearance = NSAppearance(named: appearance == "dark" ? .darkAqua : .aqua)
+            }
+        }
+        #endif
         store = ColorStore(directory: directory)
         picker = ScreenPicker(store: store)
         makeMenus()
-        makeWindows()
-        hotKey = HotKey { [weak self] in self?.pickColor() }
-        picker.beforePick = { [weak self] in
-            guard let self else { return }
-            self.restoreLibrary = self.libraryWindow.isVisible
-            self.restorePanel = self.floatingPanel.isVisible
-            self.libraryWindow.orderOut(nil); self.floatingPanel.orderOut(nil)
+        palette = PaletteWindowController(store: store) { [weak self] pressed in
+            self?.picker.pick(initiatedByPress: pressed)
         }
-        picker.afterPick = { [weak self] in
-            guard let self else { return }
-            if self.restoreLibrary { self.libraryWindow.orderFrontRegardless() }
-            if self.restorePanel { self.floatingPanel.orderFrontRegardless() }
-        }
+        if !isPreview { hotKey = HotKey { [weak self] in self?.pickColor() } }
+        picker.beforePick = { [weak self] in self?.palette.hideForPicking() }
+        picker.afterPick = { [weak self] in self?.palette.restoreAfterPick() }
         if arguments.contains("--library") { showLibrary() } else { showFloating() }
     }
 
-    private func makeWindows() {
-        libraryController = LibraryWindowController(store: store,
-            pick: { [weak self] in self?.pickColor() }, compact: { [weak self] in self?.showFloating() })
-        libraryWindow = libraryController.window
-        libraryWindow.delegate = self
-
-        floatingPanel = FloatingPanel(contentRect: NSRect(origin: .zero, size: FloatingView.size), styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel], backing: .buffered, defer: false)
-        floatingPanel.title = "Couleur"
-        floatingPanel.isFloatingPanel = true
-        floatingPanel.hidesOnDeactivate = false
-        floatingPanel.isReleasedWhenClosed = false
-        floatingPanel.titlebarAppearsTransparent = true
-        floatingPanel.titleVisibility = .visible
-        floatingPanel.isMovableByWindowBackground = true
-        floatingPanel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        floatingPanel.delegate = self
-        let accessory = NSTitlebarAccessoryViewController()
-        accessory.layoutAttribute = .right
-        let controls = NSView(frame: NSRect(x: 0, y: 0, width: 53, height: 24))
-        pinButton = NSButton(image: NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "Keep on top")!, target: self, action: #selector(togglePin))
-        pinButton.bezelStyle = .inline
-        pinButton.isBordered = false
-        pinButton.frame = NSRect(x: 0, y: 0, width: 24, height: 24)
-        pinButton.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 10, weight: .regular)
-        controls.addSubview(pinButton)
-        let expand = NSButton(image: NSImage(systemSymbolName: "arrow.up.left.and.arrow.down.right", accessibilityDescription: "Expand library")!, target: self, action: #selector(showLibrary))
-        expand.bezelStyle = .inline
-        expand.isBordered = false
-        expand.frame = NSRect(x: 25, y: 0, width: 26, height: 24)
-        expand.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 11, weight: .regular)
-        expand.toolTip = "Expand library · ⌘1"
-        controls.addSubview(expand)
-        accessory.view = controls
-        floatingPanel.addTitlebarAccessoryViewController(accessory)
-        updateFloatingPanel()
-        floatingPanel.center()
-        floatingPanel.setFrameAutosaveName("CouleurPicker")
-        floatingPanel.setContentSize(FloatingView.size)
-    }
-
-    private func updateFloatingPanel() {
-        floatingPanel.level = pinned ? .floating : .normal
-        pinButton.image = NSImage(systemSymbolName: pinned ? "pin.fill" : "pin", accessibilityDescription: "Keep on top")
-        pinButton.contentTintColor = pinned ? .secondaryLabelColor : .tertiaryLabelColor
-        pinButton.toolTip = pinned ? "Keep on top is on" : "Keep on top is off"
-        pinButton.setAccessibilityValue(pinned ? "On" : "Off")
-        floatingPanel.contentView = NSHostingView(rootView: FloatingView(store: store,
-            pick: { [weak self] in self?.picker.pick(initiatedByPress: true) }, showLibrary: { [weak self] in self?.showLibrary() }))
-    }
-
-    @objc private func togglePin() { pinned.toggle(); updateFloatingPanel() }
-    @objc private func findColors() { showLibrary(); libraryController.focusSearch() }
-
-    @objc private func showLibrary() {
-        floatingPanel?.orderOut(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        libraryWindow.makeKeyAndOrderFront(nil)
-    }
-    @objc private func showFloating() {
-        libraryWindow?.orderOut(nil)
-        floatingPanel.makeKeyAndOrderFront(nil)
-        floatingPanel.orderFrontRegardless()
-    }
-    @objc private func pickColor() { picker.pick() }
+    @objc private func findColors() { palette.findColors() }
+    @objc private func showLibrary() { palette.showLibrary() }
+    @objc private func showFloating() { palette.showPicker() }
+    @objc private func pickColor() { palette.pickColor() }
+    @objc private func closeWindow(_ sender: Any?) { (NSApp.keyWindow ?? palette.window)?.performClose(sender) }
     @objc func copy(_ sender: Any?) { if let record = store.selected { store.copy(record) } }
     @objc func paste(_ sender: Any?) { store.paste() }
-    @objc private func importLibrary() { showLibrary(); store.importLibrary() }
-    @objc private func exportLibrary() { showLibrary(); store.exportLibrary() }
+    @objc private func importLibrary() { palette.showLibrary { [weak self] in self?.store.importLibrary() } }
+    @objc private func exportLibrary() { palette.showLibrary { [weak self] in self?.store.exportLibrary() } }
     @objc private func revealLibrary() { store.revealLibrary() }
     @objc private func toggleAutoCopy() { store.autoCopy.toggle() }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showFloating(); return true }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        // Borderless panels do not advertise AppKit's standard closable style.
+        if menuItem.action == #selector(closeWindow(_:)) {
+            return (NSApp.keyWindow ?? palette?.window)?.isVisible == true
+        }
+        return true
+    }
 
     private func item(_ title: String, _ action: Selector?, key: String = "", modifiers: NSEvent.ModifierFlags = .command) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
@@ -160,7 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         file.addItem(item("Import Library…", #selector(importLibrary)))
         file.addItem(item("Export Library…", #selector(exportLibrary), key: "e", modifiers: [.command, .shift]))
         file.addItem(.separator())
-        file.addItem(NSMenuItem(title: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w"))
+        file.addItem(item("Close Window", #selector(closeWindow(_:)), key: "w"))
         let fileRoot = NSMenuItem(); fileRoot.submenu = file; main.addItem(fileRoot)
 
         let edit = NSMenu(title: "Edit")

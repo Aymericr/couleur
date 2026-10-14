@@ -93,7 +93,7 @@ struct LibraryView: View {
                     Image(systemName: "checkmark").font(.system(size: 10, weight: .medium))
                     Text(message)
                 } else {
-                    Text("Double-click to copy")
+                    Text("Click a color to copy")
                 }
             }.font(.system(size: 11)).foregroundStyle(.secondary)
                 .padding(.horizontal, 22).frame(height: 32)
@@ -174,11 +174,16 @@ private struct ColorTile: View {
     let record: SavedColor
     let select: () -> Void
     @State private var hovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var selected: Bool { store.selectedID == record.id }
+    private var copied: Bool { store.copiedColorID == record.id }
     private var named: Bool { !record.name.isEmpty && record.name != record.value.hex }
 
     var body: some View {
-        Button(action: select) {
+        Button {
+            select()
+            store.copy(record)
+        } label: {
             VStack(alignment: .leading, spacing: 9) {
                 Swatch(value: record.value).aspectRatio(1.25, contentMode: .fit)
                     .modifier(SwatchRim(radius: 8))
@@ -191,6 +196,18 @@ private struct ColorTile: View {
                             Image(systemName: "star.fill").font(.system(size: 9, weight: .medium))
                                 .frame(width: 22, height: 22).background(.regularMaterial, in: Circle()).padding(7)
                         }
+                    }
+                    .overlay(alignment: .bottomTrailing) {
+                        Label("Copied", systemImage: "checkmark")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(.regularMaterial, in: Capsule())
+                            .overlay(Capsule().strokeBorder(.primary.opacity(0.08), lineWidth: 0.5))
+                            .padding(8)
+                            .opacity(copied ? 1 : 0)
+                            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: copied)
+                            .allowsHitTesting(false).accessibilityHidden(true)
                     }
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {
@@ -210,11 +227,12 @@ private struct ColorTile: View {
             .contentShape(Rectangle())
         }.buttonStyle(QuietButtonStyle())
             .onHover { hovered = $0 }
-            .simultaneousGesture(TapGesture(count: 2).onEnded { store.copy(record) })
             .accessibilityLabel("\(record.name), \(record.value.hex)")
+            .accessibilityValue(copied ? "Copied" : record.value.formatted(store.copyFormat))
+            .accessibilityHint("Click to copy \(store.copyFormat.rawValue)")
             .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityAction(named: "Copy color") { store.copy(record) }
-            .help("\(record.source.appName.map { "Picked from \($0) · " } ?? "")Double-click to copy")
+            .help("\(record.source.appName.map { "Picked from \($0) · " } ?? "")Click to copy \(store.copyFormat.rawValue)")
             .contextMenu {
                 Button("Copy \(store.copyFormat.rawValue)") { store.copy(record) }
                 Menu("Copy as") { ForEach(CopyFormat.allCases) { format in Button(format.rawValue) { store.copy(record, as: format) } } }

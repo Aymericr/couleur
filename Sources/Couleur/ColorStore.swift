@@ -17,6 +17,7 @@ final class ColorStore: ObservableObject {
     @Published private(set) var library = ColorLibrary()
     @Published var selectedID: UUID?
     @Published var message: String?
+    @Published private(set) var copiedColorID: UUID?
     @Published var error: String?
     @Published private(set) var readOnly = false
     @Published var isSampling = false
@@ -24,7 +25,10 @@ final class ColorStore: ObservableObject {
     @Published var search = ""
     @Published var sort: LibrarySort = .newest
     @Published var copyFormat: CopyFormat = CopyFormat(rawValue: UserDefaults.standard.string(forKey: "copyFormat") ?? "") ?? .hex {
-        didSet { UserDefaults.standard.set(copyFormat.rawValue, forKey: "copyFormat") }
+        didSet {
+            UserDefaults.standard.set(copyFormat.rawValue, forKey: "copyFormat")
+            copiedColorID = nil
+        }
     }
     @Published var autoCopy: Bool = UserDefaults.standard.object(forKey: "autoCopy") as? Bool ?? true {
         didSet { UserDefaults.standard.set(autoCopy, forKey: "autoCopy") }
@@ -143,8 +147,14 @@ final class ColorStore: ObservableObject {
     func copy(_ record: SavedColor, as format: CopyFormat? = nil) {
         let format = format ?? copyFormat
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(record.value.formatted(format), forType: .string)
-        notify("Copied \(format.rawValue)")
+        guard NSPasteboard.general.setString(record.value.formatted(format), forType: .string) else {
+            messageTask?.cancel()
+            message = nil
+            copiedColorID = nil
+            error = "Could not copy the color. Please try again."
+            return
+        }
+        notify("Copied \(format.rawValue)", copiedColorID: record.id)
     }
 
     func paste() {
@@ -155,12 +165,15 @@ final class ColorStore: ObservableObject {
     }
 
     private var messageTask: Task<Void, Never>?
-    func notify(_ text: String) {
-        messageTask?.cancel(); message = text
+    func notify(_ text: String, copiedColorID: UUID? = nil) {
+        messageTask?.cancel()
+        message = text
+        self.copiedColorID = copiedColorID
         messageTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled else { return }
             self?.message = nil
+            self?.copiedColorID = nil
         }
     }
 
