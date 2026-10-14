@@ -1,7 +1,9 @@
 import AppKit
 import CouleurCore
 import OSLog
-import ScreenCaptureKit
+// Older SDKs omit Sendable annotations for ScreenCaptureKit's immutable snapshots.
+// All configuration and consumption remain confined to this main-actor session.
+@preconcurrency import ScreenCaptureKit
 
 /// One short-lived screen snapshot per display. The lens and the saved color
 /// always read the same pixels, even when the underlying content is moving.

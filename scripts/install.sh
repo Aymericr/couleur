@@ -15,5 +15,7 @@ if [[ -e "$destination" ]]; then
   fi
 fi
 ditto build/Couleur.app "$destination"
+# Let Finder notice artwork changes when replacing an existing app bundle.
+touch "$destination"
 open "$destination"
 echo "Installed $destination"
