@@ -30,8 +30,11 @@ final class RegionCapture: ObservableObject {
     @Published private(set) var accessGranted = CGPreflightScreenCaptureAccess()
     @Published private(set) var requestedAccess = UserDefaults.standard.bool(forKey: "screenAccessRequested")
     @Published private(set) var captureFailure: String?
+    @Published private(set) var relaunchFailure: String?
     @Published private(set) var checkedAfterSettings = false
-    private var resumeAfterHelp = false
+    private enum AfterHelp { case capture, relaunch }
+    private var afterHelp: AfterHelp?
+    private var isRelaunching = false
 
     var appName: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Couleur" }
 
@@ -125,29 +128,35 @@ final class RegionCapture: ObservableObject {
 
     func continueCapture() {
         captureFailure = nil
-        resumeAfterHelp = true
+        afterHelp = .capture
         helpPresented = false
     }
 
     func helpDidDismiss() {
-        guard resumeAfterHelp else { return }
-        resumeAfterHelp = false
-        capture()
+        let action = afterHelp
+        afterHelp = nil
+        switch action {
+        case .capture: capture()
+        case .relaunch:
+            // SwiftUI's sheet must finish closing before AppKit will accept quit.
+            Task {
+                do { try await AppRelaunch.perform() }
+                catch {
+                    isRelaunching = false
+                    relaunchFailure = "Couldn’t reopen \(appName). \(error.localizedDescription)"
+                    showHelp()
+                }
+            }
+        case nil: break
+        }
     }
 
     func relaunch() {
-        // Start the same signed app, but let its old process finish before it
-        // registers the hotkey or reads the library. No settings or grants are changed.
-        guard let executable = Bundle.main.executableURL else { return }
-        let replacement = Process()
-        replacement.executableURL = executable
-        replacement.arguments = ["--relaunch-after", String(ProcessInfo.processInfo.processIdentifier), "--capture-help"]
-        let arguments = ProcessInfo.processInfo.arguments
-        if let index = arguments.firstIndex(of: "--data-directory"), arguments.indices.contains(index + 1) {
-            replacement.arguments?.append(contentsOf: ["--data-directory", arguments[index + 1]])
-        }
-        do { try replacement.run(); NSApp.terminate(nil) }
-        catch { captureFailure = "Could not reopen automatically. Quit \(appName), then open it again." }
+        guard !isRelaunching else { return }
+        isRelaunching = true
+        relaunchFailure = nil
+        afterHelp = .relaunch
+        helpPresented = false
     }
 
     func cancel() {

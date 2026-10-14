@@ -69,6 +69,11 @@ struct CaptureAccessView: View {
                 }.padding(.top, 22)
             }
 
+            if let failure = capture.relaunchFailure {
+                Text(failure).font(.system(size: 11)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true).padding(.top, 18)
+            }
+
             if let failure = capture.captureFailure {
                 DisclosureGroup("Capture details") {
                     Text(failure).font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)

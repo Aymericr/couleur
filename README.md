@@ -52,7 +52,7 @@ The current image stays in memory until the next successful capture or app exit.
 
 ### Screen access
 
-Area capture needs **Screen Recording** permission; point picking still works without it. The first capture opens an in-app setup sheet before requesting macOS access. It names the correct app, links directly to the privacy settings, checks access when you return, and provides **Quit & Reopen** if macOS needs a restart. A denied permission and a capture failure have different guidance. This feature does not record audio, capture continuously, or send images anywhere.
+Area capture needs **Screen Recording** permission; point picking still works without it. The first capture opens an in-app setup sheet before requesting macOS access. It names the correct app, links directly to the privacy settings, checks access when you return, and provides **Quit & Reopen** if macOS needs a restart. Restart closes the setup sheet, opens the same app through macOS, and returns to setup with a fresh permission check. The replacement waits for the previous instance to exit before opening your library. A denied permission and a capture failure have different guidance. This feature does not record audio, capture continuously, or send images anywhere.
 
 Local builds use an available Developer ID or Apple Development signing certificate to keep a stable app identity across updates. You can select one explicitly with `COULEUR_SIGN_IDENTITY`. Without a certificate, builds fall back to ad-hoc signing; macOS may require renewing Screen Recording permission after a rebuild. If an older ad-hoc build remains enabled in Settings, remove that old entry and add the current app. The preview and installed app have separate permissions, labeled **Couleur Preview** and **Couleur**.
 

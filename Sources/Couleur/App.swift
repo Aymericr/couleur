@@ -1,18 +1,10 @@
 import AppKit
 import CouleurCore
-import Darwin
 
 @main
 @MainActor
 enum CouleurApp {
     static func main() {
-        let arguments = ProcessInfo.processInfo.arguments
-        if let index = arguments.firstIndex(of: "--relaunch-after"), arguments.indices.contains(index + 1),
-           let pid = Int32(arguments[index + 1]) {
-            let deadline = Date().addingTimeInterval(5)
-            while kill(pid, 0) == 0 && Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
-            guard kill(pid, 0) != 0 else { return }
-        }
         let application = NSApplication.shared
         let delegate = AppDelegate()
         application.delegate = delegate
@@ -31,6 +23,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var hotKey: HotKey?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Task {
+            guard await AppRelaunch.waitForPreviousInstance() else { NSApp.terminate(nil); return }
+            finishLaunching()
+        }
+    }
+
+    private func finishLaunching() {
         let arguments = ProcessInfo.processInfo.arguments
         var directory: URL? = if let index = arguments.firstIndex(of: "--data-directory"), arguments.indices.contains(index + 1) {
             URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
@@ -106,11 +105,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         // Dock activation and returning from Settings preserve the current view
         // and any setup sheet. Never reveal our window inside a screen selection.
-        if !store.isSampling { palette.reveal() }
+        if let store, !store.isSampling { palette.reveal() }
         return true
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
-    func applicationWillTerminate(_ notification: Notification) { regionCapture.cancel() }
+    func applicationWillTerminate(_ notification: Notification) { regionCapture?.cancel() }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         // Borderless panels do not advertise AppKit's standard closable style.
