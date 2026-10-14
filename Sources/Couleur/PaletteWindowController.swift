@@ -16,6 +16,7 @@ private final class PalettePanel: NSPanel {
 final class PaletteWindowController: NSWindowController, NSWindowDelegate {
     private let store: ColorStore
     private let pick: (Bool) -> Void
+    private let capture: RegionCapture
     private let panel: PalettePanel
     private var library: LibraryController!
     private var compact: NSHostingView<FloatingView>!
@@ -23,6 +24,7 @@ final class PaletteWindowController: NSWindowController, NSWindowDelegate {
     private var requestedExpanded = false
     private var transitioning = false
     private var queuedPick = false
+    private var queuedCapture = false
     private var libraryActions: [() -> Void] = []
     private var compactFrame = NSRect.zero
     private var expandedSize = NSSize(width: 1040, height: 700)
@@ -36,9 +38,10 @@ final class PaletteWindowController: NSWindowController, NSWindowDelegate {
     private static let expandedStyle: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView, .nonactivatingPanel]
     private static let minimumLibrarySize = NSSize(width: 760, height: 560)
 
-    init(store: ColorStore, pick: @escaping (Bool) -> Void) {
+    init(store: ColorStore, pick: @escaping (Bool) -> Void, capture: RegionCapture) {
         self.store = store
         self.pick = pick
+        self.capture = capture
         panel = PalettePanel(contentRect: NSRect(origin: .zero, size: FloatingView.size),
                              styleMask: Self.compactStyle, backing: .buffered, defer: false)
         super.init(window: panel)
@@ -52,7 +55,9 @@ final class PaletteWindowController: NSWindowController, NSWindowDelegate {
         panel.isMovableByWindowBackground = true
         panel.tabbingMode = .disallowed
         library = LibraryController(window: panel, store: store,
-            pick: { [weak self] in self?.pickColor() }, compact: { [weak self] in self?.showPicker() })
+            captureManager: capture,
+            pick: { [weak self] in self?.pickColor() }, capture: { [weak self] in self?.capturePalette() },
+            compact: { [weak self] in self?.showPicker() })
         refreshCompact()
         install(expanded: false)
         panel.center()
@@ -77,11 +82,17 @@ final class PaletteWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func showPicker() { show(expanded: false) }
+    func reveal() { show(expanded: requestedExpanded) }
     func findColors() { showLibrary { [weak self] in self?.library.focusSearch() } }
 
     func pickColor(initiatedByPress: Bool = false) {
         guard !transitioning else { queuedPick = true; return }
         pick(initiatedByPress)
+    }
+
+    func capturePalette() {
+        guard !transitioning else { queuedCapture = true; return }
+        capture.capture()
     }
 
     func hideForPicking() {
@@ -111,6 +122,7 @@ final class PaletteWindowController: NSWindowController, NSWindowDelegate {
             libraryActions.removeAll()
             if expanded { actions.forEach { $0() } }
             if queuedPick { queuedPick = false; pick(false) }
+            if queuedCapture { queuedCapture = false; capture.capture() }
             return
         }
         transition(to: requestedExpanded)
@@ -119,6 +131,7 @@ final class PaletteWindowController: NSWindowController, NSWindowDelegate {
     private func refreshCompact() {
         let root = FloatingView(store: store,
             pick: { [weak self] in self?.pickColor(initiatedByPress: true) },
+            capture: { [weak self] in self?.capturePalette() },
             showLibrary: { [weak self] in self?.showLibrary() },
             close: { [weak self] in self?.panel.performClose(nil) },
             togglePin: { [weak self] in self?.togglePin() }, isPinned: pinned)

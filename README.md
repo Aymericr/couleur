@@ -14,6 +14,7 @@ The app opens as a **256 × 158 pt floating palette**: a small color well beside
 - **Click the color code** to copy it again. Click a recent swatch to select and copy it.
 - Use the **format menu** beside the code to change its encoding. **Keep on top** is in the same menu.
 - The **expand button at the bottom right** unfolds the same window into the full library. The **Compact Picker** toolbar button (or **⌘2**) folds it back to its original position. Search, selection, and sidebar state are preserved. The transition respects **Reduce Motion**.
+- The **capture icon in the header** (or **⌘⇧A** while Couleur is active) lets you drag a screen area and explore its palette.
 
 Automatic copying and keeping the picker on top are enabled initially. The floating window can accompany other apps and full-screen Spaces. Drag the quiet header to move it; the small close button hides it.
 
@@ -34,6 +35,26 @@ Every pick is saved immediately and kept across app restarts, with no history li
 Screen metadata is best effort: the source app is resolved from the frontmost normal window under the pointer. Window titles are only saved when macOS supplies them, and can be absent without Screen Recording permission. Browser URLs are not read automatically. Clipboard imports are labeled as pasted colors. Screen coordinates use the Core Graphics origin at the top-left of the primary display and may be negative on other displays.
 
 The native sampler does not require this app to request Screen Recording or Accessibility access. It displays macOS's magnifying loupe. Canceling with Esc never creates an entry or changes the clipboard. During a Shift session, previously collected colors remain saved when you cancel.
+
+## Screen palettes
+
+Choose **Capture Screen Palette** from the File or menu-bar menu, the compact header, or the library toolbar. Drag a rectangle using macOS's screenshot selector; **Esc** cancels. Couleur hides its window during selection, then expands into the result:
+
+- Up to **five dominant colors**, ordered by area, with approximate percentages and a proportion strip.
+- Up to **64 grouped shades**, sortable by area or hue.
+- The captured image, with a live color readout under the pointer. **Click anywhere in the image** to pick the exact full-resolution pixel.
+- Click a shade to **copy and save it** in the current copy format. A checkmark confirms the copy. Repeated clicks on the same color in that capture reuse its history entry.
+- **Save palette** keeps either the dominant colors or all the grouped shades in a named collection. Names and notes on already-picked, unfiled colors are preserved.
+
+Extraction uses a bounded image sample and population-weighted OKLab clustering. Representatives are colors found in that sample. Group percentages are estimates, not exact pixel counts; very small accents may be absent from the grouped palette. The image picker reads the original pixels independently, so you can still access every color in the captured area. Both paths convert to sRGB.
+
+The current image stays in memory until the next successful capture or app exit. Temporary screenshot files are removed after processing. **Saved colors and collections persist; screenshots are not retained in your library.** Capture colors remember the image dimensions and either the group's estimated area or the exact pixel coordinates within the image. The system screenshot selector does not report a reliable source app, so capture colors are labeled “Screen capture” rather than guessing one.
+
+### Screen access
+
+Area capture needs **Screen Recording** permission; point picking still works without it. The first capture opens an in-app setup sheet before requesting macOS access. It names the correct app, links directly to the privacy settings, checks access when you return, and provides **Quit & Reopen** if macOS needs a restart. A denied permission and a capture failure have different guidance. This feature does not record audio, capture continuously, or send images anywhere.
+
+Local builds use an available Developer ID or Apple Development signing certificate to keep a stable app identity across updates. You can select one explicitly with `COULEUR_SIGN_IDENTITY`. Without a certificate, builds fall back to ad-hoc signing; macOS may require renewing Screen Recording permission after a rebuild. If an older ad-hoc build remains enabled in Settings, remove that old entry and add the current app. The preview and installed app have separate permissions, labeled **Couleur Preview** and **Couleur**.
 
 ## Copy formats
 
@@ -61,10 +82,10 @@ Requires **macOS 14 or later**, Xcode command-line tools, and a Swift 6 toolchai
 ./scripts/install.sh
 ```
 
-This builds and ad-hoc signs `Couleur.app`, installs it in `/Applications`, and opens the compact picker. The original `/Applications/Couleurs.app` is a separate app. For a user-only install, run `./scripts/install.sh "$HOME/Applications"`. Quit Couleur before updating.
+This builds and signs `Couleur.app`, installs it in `/Applications`, and opens the compact picker. The original `/Applications/Couleurs.app` is a separate app. For a user-only install, run `./scripts/install.sh "$HOME/Applications"`. Quit Couleur before updating.
 
 ```sh
-swift test                     # Conversion, parsing, persistence, and recovery checks
+swift test                     # Colors, palette extraction, pixel picking, storage, and recovery
 ./scripts/build.sh debug        # Build a local .app
 open build/Couleur.app          # Compact picker
 open build/Couleur.app --args --library
@@ -75,12 +96,13 @@ For visual and interaction checks alongside the installed app:
 
 ```sh
 ./scripts/preview.sh light      # Or dark; quit the preview before rebuilding
+./scripts/preview.sh light /path/to/image.png  # Exercise the palette UI without screen access
 open "build/Couleur Preview.app"
 ```
 
 The debug preview has a separate bundle ID, preferences, and library in `build/preview-data`. It starts with six sample colors and does not register the global shortcut. Its appearance override applies only to the preview, leaving your system appearance and real library alone. The normal app also accepts `--data-directory /path/to/test-library` for an isolated library.
 
-The app is signed for local personal use, not notarized for distribution. Rebuilding does not need an Apple Developer account. The checked-in icon is generated by `scripts/make-icon.swift`; regenerate it with:
+The app is signed for local personal use, not notarized for distribution. Rebuilding does not require an Apple Developer account, though a signing certificate keeps privacy grants stable across rebuilds. The checked-in icon is generated by `scripts/make-icon.swift`; regenerate it with:
 
 ```sh
 swift scripts/make-icon.swift
@@ -102,7 +124,7 @@ A damaged or unsupported file opens in read-only recovery mode and is never sile
 
 ## Structure
 
-`CouleurCore` contains sRGB values, format conversion, parsing, the versioned data model, and atomic file persistence. `Couleur` contains the shared native window, compact picker, library, screen-source lookup, global shortcut, and clipboard behavior. Tests exercise the core without requiring display capture, UI permissions, or access to your real library.
+`CouleurCore` contains sRGB values, format conversion, parsing, perceptual palette extraction, color-managed image sampling, the versioned data model, and atomic file persistence. `Couleur` contains the shared native window, compact picker, library, region-capture workflow and permission guide, screen-source lookup, global shortcut, and clipboard behavior. Tests exercise the core without requiring display capture, UI permissions, or access to your real library.
 
 GitHub Actions runs the core tests and builds the app on macOS. Hosted CI results are independent of local validation.
 

@@ -66,7 +66,7 @@ struct SourceIcon: View {
             if let icon = SourceIcons.shared.icon(for: source.bundleIdentifier) {
                 Image(nsImage: icon).resizable().interpolation(.high)
             } else {
-                Image(systemName: source.method == "Pasted color" ? "clipboard" : "app.dashed")
+                Image(systemName: source.capture != nil ? "viewfinder" : (source.method == "Pasted color" ? "clipboard" : "app.dashed"))
                     .resizable().scaledToFit().foregroundStyle(.secondary).padding(1)
             }
         }.frame(width: size, height: size).accessibilityHidden(true)

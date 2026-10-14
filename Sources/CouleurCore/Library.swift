@@ -8,11 +8,35 @@ public struct ColorSource: Codable, Equatable, Sendable {
     public var x: Double?
     public var y: Double?
     public var method: String
+    public var capture: CaptureSource?
 
     public init(appName: String? = nil, bundleIdentifier: String? = nil, windowTitle: String? = nil,
                 displayName: String? = nil, x: Double? = nil, y: Double? = nil, method: String = "Screen pick") {
         self.appName = appName; self.bundleIdentifier = bundleIdentifier; self.windowTitle = windowTitle
         self.displayName = displayName; self.x = x; self.y = y; self.method = method
+    }
+}
+
+/// Additional context for a color taken from a captured image. Pixel coordinates
+/// are relative to the top-left of the image, never mistaken for screen coordinates.
+public struct CaptureSource: Codable, Equatable, Sendable {
+    public var id: UUID
+    public var width: Int
+    public var height: Int
+    public var pixelX: Int?
+    public var pixelY: Int?
+    public var proportion: Double?
+
+    public init(id: UUID = UUID(), width: Int, height: Int, pixelX: Int? = nil, pixelY: Int? = nil, proportion: Double? = nil) {
+        self.id = id; self.width = width; self.height = height
+        self.pixelX = pixelX; self.pixelY = pixelY; self.proportion = proportion
+    }
+
+    var isValid: Bool {
+        (1...100_000).contains(width) && (1...100_000).contains(height)
+            && (pixelX.map { (0..<width).contains($0) } ?? true)
+            && (pixelY.map { (0..<height).contains($0) } ?? true)
+            && (proportion.map { $0.isFinite && (0...1).contains($0) } ?? true)
     }
 }
 
@@ -50,7 +74,8 @@ public struct ColorLibrary: Codable, Equatable, Sendable {
     public func validate() throws {
         guard version == 1 else { throw LibraryError.unsupportedVersion(version) }
         guard colors.allSatisfy({ color in
-            color.value.isValid && [color.source.x, color.source.y].compactMap { $0 }.allSatisfy { $0.isFinite && abs($0) <= 10_000_000 }
+            color.value.isValid && (color.source.capture?.isValid ?? true)
+                && [color.source.x, color.source.y].compactMap { $0 }.allSatisfy { $0.isFinite && abs($0) <= 10_000_000 }
         }), Set(colors.map(\.id)).count == colors.count,
               Set(collections.map(\.id)).count == collections.count,
               colors.allSatisfy({ color in color.collectionID == nil || collections.contains(where: { $0.id == color.collectionID }) })

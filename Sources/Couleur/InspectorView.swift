@@ -10,7 +10,11 @@ struct InspectorContainer: View {
             } else {
                 VStack(spacing: 10) {
                     Image(systemName: "slider.horizontal.3").font(.system(size: 24, weight: .light))
-                    Text("Select a color").font(.system(size: 12))
+                    Text(store.filter == .capture ? "Choose a color" : "Select a color").font(.system(size: 12))
+                    if store.filter == .capture {
+                        Text("Click a shade or a point in the image\nto copy it and keep it in your library.")
+                            .font(.system(size: 11)).multilineTextAlignment(.center).lineSpacing(3)
+                    }
                 }.foregroundStyle(.tertiary).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -121,6 +125,17 @@ struct InspectorView: View {
             }
             if let title = record.source.windowTitle, !title.isEmpty {
                 Text(title).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(3).textSelection(.enabled)
+            }
+            if let capture = record.source.capture {
+                VStack(alignment: .leading, spacing: 7) {
+                    sourceRow("viewfinder", "\(capture.width) × \(capture.height) px capture")
+                    if let proportion = capture.proportion {
+                        sourceRow("chart.pie", "About \(proportion.formatted(.percent.precision(.fractionLength(1)))) of the image")
+                    }
+                    if let x = capture.pixelX, let y = capture.pixelY {
+                        sourceRow("scope", "Pixel \(x), \(y) in capture")
+                    }
+                }
             }
             if record.source.displayName != nil || record.source.bundleIdentifier != nil || record.source.x != nil {
                 DisclosureGroup("Details") {

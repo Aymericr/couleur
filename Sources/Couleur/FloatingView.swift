@@ -7,6 +7,7 @@ struct FloatingView: View {
     static let size = NSSize(width: 256, height: 158)
     @ObservedObject var store: ColorStore
     let pick: () -> Void
+    let capture: () -> Void
     let showLibrary: () -> Void
     let close: () -> Void
     let togglePin: () -> Void
@@ -53,6 +54,11 @@ struct FloatingView: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .overlay(WindowDragRegion())
+            Button(action: capture) {
+                Image(systemName: "viewfinder").font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(.secondary).frame(width: 26, height: 24)
+            }.buttonStyle(QuietButtonStyle()).help("Capture a palette · ⌘⇧A").accessibilityLabel("Capture screen palette")
+                .disabled(store.isSampling || store.readOnly)
             Button(action: close) {
                 Image(systemName: "xmark").font(.system(size: 8, weight: .medium))
                     .foregroundStyle(.tertiary).frame(width: 20, height: 24)

@@ -21,6 +21,8 @@ final class ColorStore: ObservableObject {
     @Published var error: String?
     @Published private(set) var readOnly = false
     @Published var isSampling = false
+    @Published var isExtracting = false
+    @Published var screenPalette: ScreenPalette?
     @Published var filter: LibraryFilter = .all
     @Published var search = ""
     @Published var sort: LibrarySort = .newest
@@ -49,6 +51,7 @@ final class ColorStore: ObservableObject {
         let colors = library.colors.filter { color in
             let matches: Bool
             switch filter {
+            case .capture: matches = false
             case .all: matches = true
             case .favorites: matches = color.favorite
             case .unfiled: matches = color.collectionID == nil
@@ -68,6 +71,7 @@ final class ColorStore: ObservableObject {
 
     var filterTitle: String {
         switch filter {
+        case .capture: "Screen Palette"
         case .all: "All colors"
         case .favorites: "Favorites"
         case .unfiled: "Unfiled"
@@ -78,12 +82,13 @@ final class ColorStore: ObservableObject {
     func collectionName(_ id: UUID?) -> String { library.collections.first { $0.id == id }?.name ?? "Unfiled" }
 
     /// Commit only after the disk write succeeds, so the UI never promises a save that failed.
-    private func commit(_ edit: (inout ColorLibrary) -> Void) {
-        guard !readOnly else { error = "Your library could not be loaded. Reveal the library folder and recover the file before making changes."; return }
+    @discardableResult
+    private func commit(_ edit: (inout ColorLibrary) -> Void) -> Bool {
+        guard !readOnly else { error = "Your library could not be loaded. Reveal the library folder and recover the file before making changes."; return false }
         var next = library
         edit(&next)
-        do { try file.save(next); library = next }
-        catch { self.error = "Could not save: \(error.localizedDescription)" }
+        do { try file.save(next); library = next; return true }
+        catch { self.error = "Could not save: \(error.localizedDescription)"; return false }
     }
 
     func add(_ value: ColorValue, source: ColorSource) {
@@ -92,9 +97,51 @@ final class ColorStore: ObservableObject {
         commit { $0.colors.insert(record, at: 0) }
         guard library.colors.contains(where: { $0.id == record.id }) else { return }
         search = ""
-        if filter == .favorites { filter = .all }
+        if filter == .favorites || filter == .capture { filter = .all }
         selectedID = record.id
         if autoCopy { copy(record) } else { notify("Color saved") }
+    }
+
+    /// A capture swatch is saved on first use. Further clicks copy the same record.
+    func keepCapturedColor(_ value: ColorValue, proportion: Double? = nil, x: Int? = nil, y: Int? = nil) {
+        guard let capture = screenPalette else { return }
+        let existing = library.colors.first { $0.source.capture?.id == capture.id && $0.value == value }
+        let record = existing ?? SavedColor(name: value.hex, value: value, createdAt: capture.createdAt,
+                                            source: capture.source(proportion: proportion, x: x, y: y))
+        if existing == nil {
+            guard commit({ $0.colors.insert(record, at: 0) }) else { return }
+        }
+        selectedID = record.id
+        copy(record)
+    }
+
+    func saveCapturePalette(name: String, dominantOnly: Bool) {
+        guard let capture = screenPalette else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        var uniqueName = trimmed
+        var suffix = 2
+        while library.collections.contains(where: { $0.name.localizedCaseInsensitiveCompare(uniqueName) == .orderedSame }) {
+            uniqueName = "\(trimmed) (\(suffix))"; suffix += 1
+        }
+        let collection = ColorCollection(name: uniqueName)
+        let colors = dominantOnly ? capture.colors.dominant : capture.colors.shades
+        guard commit({ library in
+            library.collections.append(collection)
+            for color in colors {
+                if let index = library.colors.firstIndex(where: {
+                    $0.source.capture?.id == capture.id && $0.value == color.value && $0.collectionID == nil
+                }) {
+                    // Keep names and notes on colors already picked from this capture.
+                    library.colors[index].collectionID = collection.id
+                    library.colors[index].updatedAt = Date()
+                } else {
+                    library.colors.insert(SavedColor(name: color.value.hex, value: color.value, createdAt: capture.createdAt,
+                                                     collectionID: collection.id, source: capture.source(proportion: color.proportion)), at: 0)
+                }
+            }
+        }) else { return }
+        notify("Saved \(colors.count) colors to \(uniqueName)")
     }
 
     func update(_ id: UUID, _ edit: (inout SavedColor) -> Void) {
@@ -213,7 +260,7 @@ final class ColorStore: ObservableObject {
     }
 }
 
-enum LibraryFilter: Hashable { case all, favorites, unfiled, collection(UUID) }
+enum LibraryFilter: Hashable { case all, favorites, unfiled, collection(UUID), capture }
 enum LibrarySort: String, CaseIterable, Identifiable {
     case newest = "Newest first", name = "Name", hue = "Hue"
     var id: String { rawValue }

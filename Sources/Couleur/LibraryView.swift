@@ -15,6 +15,12 @@ struct LibrarySidebar: View {
     var body: some View {
         VStack(spacing: 0) {
             List(selection: selection) {
+                if store.screenPalette != nil || store.isExtracting {
+                    Section {
+                        Label("Screen Palette", systemImage: "viewfinder").font(.system(size: 13))
+                            .padding(.vertical, 3).tag(LibraryFilter.capture)
+                    }
+                }
                 Section("Library") {
                     row("All Colors", icon: "square.grid.2x2", filter: .all, count: store.library.colors.count)
                     row("Favorites", icon: "star", filter: .favorites, count: store.library.colors.filter(\.favorite).count)
@@ -79,26 +85,40 @@ struct LibrarySidebar: View {
 
 struct LibraryView: View {
     @ObservedObject var store: ColorStore
+    @ObservedObject var capture: RegionCapture
     let pick: () -> Void
     @FocusState private var gridFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            if store.visible.isEmpty { emptyState }
+            if store.filter == .capture {
+                if store.isExtracting {
+                    VStack(spacing: 12) {
+                        ProgressView().controlSize(.small)
+                        Text("Finding the colors…").font(.system(size: 12)).foregroundStyle(.secondary)
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let capture = store.screenPalette {
+                    CapturePaletteView(store: store, capture: capture).id(capture.id)
+                } else { emptyState }
+            } else if store.visible.isEmpty { emptyState }
             else { colorGrid }
             HStack(spacing: 6) {
-                Text("\(store.visible.count.formatted()) \(store.visible.count == 1 ? "color" : "colors")")
+                if store.filter == .capture { Text("sRGB") }
+                else { Text("\(store.visible.count.formatted()) \(store.visible.count == 1 ? "color" : "colors")") }
                 Spacer()
                 if let message = store.message {
                     Image(systemName: "checkmark").font(.system(size: 10, weight: .medium))
                     Text(message)
                 } else {
-                    Text("Click a color to copy")
+                    Text(store.filter == .capture ? "Click a color to copy & keep" : "Click a color to copy")
                 }
             }.font(.system(size: 11)).foregroundStyle(.secondary)
                 .padding(.horizontal, 22).frame(height: 32)
         }
         .background(Color(nsColor: .textBackgroundColor))
+        .sheet(isPresented: $capture.helpPresented, onDismiss: capture.helpDidDismiss) {
+            CaptureAccessView(capture: capture)
+        }
         .alert("Couleur", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) {
             Button("OK") { store.error = nil }
             if store.readOnly { Button("Reveal library folder") { store.revealLibrary() } }
@@ -151,6 +171,7 @@ struct LibraryView: View {
         return "Pick anywhere on your screen.\nEvery color is remembered."
     }
     private func selectFirstVisible() {
+        guard store.filter != .capture else { return }
         if !store.visible.contains(where: { $0.id == store.selectedID }) { store.selectedID = store.visible.first?.id }
     }
     private func moveSelection(_ direction: MoveCommandDirection, columns: Int) {

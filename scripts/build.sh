@@ -13,5 +13,5 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$binary_dir/Couleur" "$app/Contents/MacOS/Couleur"
 cp Resources/Info.plist "$app/Contents/Info.plist"
 if [[ -f Resources/AppIcon.icns ]]; then cp Resources/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"; fi
-codesign --force --sign - --identifier com.aymeric.couleur "$app"
+bash scripts/sign.sh "$app" com.aymeric.couleur
 echo "Built $PWD/$app"

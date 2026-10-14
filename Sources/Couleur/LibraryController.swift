@@ -8,6 +8,7 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
     private weak var window: NSWindow?
     private let store: ColorStore
     private let pick: () -> Void
+    private let capture: () -> Void
     private let compact: () -> Void
     private let split = NSSplitViewController()
     private var inspector: NSSplitViewItem!
@@ -15,9 +16,13 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
     private let searchItem = NSSearchToolbarItem(itemIdentifier: .colorSearch)
     private let libraryToolbar = NSToolbar(identifier: "CouleurLibraryToolbar")
     private var pickItem: NSToolbarItem?
+    private var captureItem: NSToolbarItem?
+    private var sortItem: NSToolbarItem?
 
-    init(window: NSWindow, store: ColorStore, pick: @escaping () -> Void, compact: @escaping () -> Void) {
+    init(window: NSWindow, store: ColorStore, captureManager: RegionCapture, pick: @escaping () -> Void,
+         capture: @escaping () -> Void, compact: @escaping () -> Void) {
         self.store = store; self.pick = pick; self.compact = compact
+        self.capture = capture
         self.window = window
         super.init()
 
@@ -26,7 +31,7 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
         sidebar.maximumThickness = 240
         sidebar.preferredThicknessFraction = 0.19
         sidebar.canCollapseFromWindowResize = false
-        let content = NSSplitViewItem(viewController: NSHostingController(rootView: LibraryView(store: store, pick: pick)))
+        let content = NSSplitViewItem(viewController: NSHostingController(rootView: LibraryView(store: store, capture: captureManager, pick: pick)))
         content.minimumThickness = 300
         content.holdingPriority = .defaultLow
         inspector = NSSplitViewItem(inspectorWithViewController: InspectorHost(store: store))
@@ -63,6 +68,7 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
     }
 
     func focusSearch() {
+        if store.filter == .capture { store.filter = .all }
         searchItem.beginSearchInteraction()
         searchItem.searchField.selectText(nil)
     }
@@ -73,15 +79,18 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
         }
         if searchItem.searchField.stringValue != store.search { searchItem.searchField.stringValue = store.search }
         pickItem?.isEnabled = !store.isSampling && !store.readOnly
+        captureItem?.isEnabled = !store.isSampling && !store.readOnly
+        sortItem?.isEnabled = store.filter != .capture
     }
 
     func controlTextDidChange(_ obj: Notification) {
         guard let field = obj.object as? NSSearchField else { return }
+        if store.filter == .capture { store.filter = .all }
         store.search = field.stringValue
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.toggleSidebar, .colorSidebarSeparator, .flexibleSpace, .colorPick, .colorSort, .colorSearch, .colorCompact, .colorInspectorSeparator, .colorInspector]
+        [.toggleSidebar, .colorSidebarSeparator, .flexibleSpace, .colorPick, .colorCapture, .colorSort, .colorSearch, .colorCompact, .colorInspectorSeparator, .colorInspector]
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         toolbarDefaultItemIdentifiers(toolbar)
@@ -104,6 +113,12 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
             item.toolTip = "Return to compact picker · ⌘2"
             item.visibilityPriority = .high
             return item
+        case .colorCapture:
+            let item = button(id, "Capture Palette", symbol: "viewfinder", action: #selector(capturePalette))
+            item.toolTip = "Capture a screen area · ⌘⇧A"
+            item.visibilityPriority = .high
+            captureItem = item
+            return item
         case .colorInspector:
             return button(id, "Toggle Inspector", symbol: "sidebar.right", action: #selector(toggleInspector))
         case .colorSort:
@@ -119,6 +134,7 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
                 menu.addItem(option)
             }
             item.menu = menu
+            sortItem = item
             return item
         case .colorSearch:
             searchItem.label = "Search Colors"
@@ -149,6 +165,7 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
         if let raw = sender.representedObject as? String, let sort = LibrarySort(rawValue: raw) { store.sort = sort }
     }
     @objc private func pickColor() { pick() }
+    @objc private func capturePalette() { capture() }
     @objc private func showCompact() { compact() }
     @objc private func toggleSidebar() { toggle(split.splitViewItems[0]) }
     @objc private func toggleInspector() { toggle(inspector) }
@@ -186,6 +203,7 @@ private extension NSToolbarItem.Identifier {
     static let colorSidebarSeparator = Self("ColorSidebarSeparator")
     static let colorInspectorSeparator = Self("ColorInspectorSeparator")
     static let colorPick = Self("ColorPick")
+    static let colorCapture = Self("ColorCapture")
     static let colorSort = Self("ColorSort")
     static let colorSearch = Self("ColorSearch")
     static let colorCompact = Self("ColorCompact")

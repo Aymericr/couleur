@@ -1,9 +1,18 @@
 import AppKit
+import CouleurCore
+import Darwin
 
 @main
 @MainActor
 enum CouleurApp {
     static func main() {
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "--relaunch-after"), arguments.indices.contains(index + 1),
+           let pid = Int32(arguments[index + 1]) {
+            let deadline = Date().addingTimeInterval(5)
+            while kill(pid, 0) == 0 && Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+            guard kill(pid, 0) != 0 else { return }
+        }
         let application = NSApplication.shared
         let delegate = AppDelegate()
         application.delegate = delegate
@@ -16,6 +25,7 @@ enum CouleurApp {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var store: ColorStore!
     private var picker: ScreenPicker!
+    private var regionCapture: RegionCapture!
     private var palette: PaletteWindowController!
     private var statusItem: NSStatusItem!
     private var hotKey: HotKey?
@@ -38,20 +48,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         #endif
         store = ColorStore(directory: directory)
         picker = ScreenPicker(store: store)
+        regionCapture = RegionCapture(store: store)
         makeMenus()
-        palette = PaletteWindowController(store: store) { [weak self] pressed in
+        palette = PaletteWindowController(store: store, pick: { [weak self] pressed in
             self?.picker.pick(initiatedByPress: pressed)
-        }
+        }, capture: regionCapture)
         if !isPreview { hotKey = HotKey { [weak self] in self?.pickColor() } }
         picker.beforePick = { [weak self] in self?.palette.hideForPicking() }
         picker.afterPick = { [weak self] in self?.palette.restoreAfterPick() }
-        if arguments.contains("--library") { showLibrary() } else { showFloating() }
+        regionCapture.beforeCapture = { [weak self] in self?.palette.hideForPicking() }
+        regionCapture.afterCapture = { [weak self] showPalette in
+            self?.palette.restoreAfterPick()
+            if showPalette { self?.palette.showLibrary() }
+        }
+        regionCapture.presentHelp = { [weak self] in
+            self?.palette.showLibrary { [weak self] in self?.regionCapture.helpPresented = true }
+        }
+        #if DEBUG
+        if isPreview, !arguments.contains("--capture-help"),
+           let path = Bundle.main.object(forInfoDictionaryKey: "CouleurPreviewImage") as? String {
+            store.filter = .capture
+            store.isExtracting = true
+            palette.showLibrary()
+            Task {
+                do {
+                    let result = try await Task.detached(priority: .userInitiated) {
+                        let image = try PaletteImage(data: Data(contentsOf: URL(fileURLWithPath: path)))
+                        return try (image, image.extract())
+                    }.value
+                    store.screenPalette = ScreenPalette(image: result.0, colors: result.1)
+                    store.selectedID = nil
+                } catch { store.error = error.localizedDescription }
+                store.isExtracting = false
+            }
+            return
+        }
+        #endif
+        if arguments.contains("--capture-help") {
+            regionCapture.checkAccess(explicit: true)
+            regionCapture.presentHelp?()
+        } else if arguments.contains("--library") { showLibrary() } else { showFloating() }
     }
 
     @objc private func findColors() { palette.findColors() }
     @objc private func showLibrary() { palette.showLibrary() }
     @objc private func showFloating() { palette.showPicker() }
     @objc private func pickColor() { palette.pickColor() }
+    @objc private func capturePalette() { palette.capturePalette() }
     @objc private func closeWindow(_ sender: Any?) { (NSApp.keyWindow ?? palette.window)?.performClose(sender) }
     @objc func copy(_ sender: Any?) { if let record = store.selected { store.copy(record) } }
     @objc func paste(_ sender: Any?) { store.paste() }
@@ -60,13 +103,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func revealLibrary() { store.revealLibrary() }
     @objc private func toggleAutoCopy() { store.autoCopy.toggle() }
 
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showFloating(); return true }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // Dock activation and returning from Settings preserve the current view
+        // and any setup sheet. Never reveal our window inside a screen selection.
+        if !store.isSampling { palette.reveal() }
+        return true
+    }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+    func applicationWillTerminate(_ notification: Notification) { regionCapture.cancel() }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         // Borderless panels do not advertise AppKit's standard closable style.
         if menuItem.action == #selector(closeWindow(_:)) {
             return (NSApp.keyWindow ?? palette?.window)?.isVisible == true
+        }
+        if menuItem.action == #selector(pickColor) || menuItem.action == #selector(capturePalette) {
+            return !store.isSampling && !store.readOnly && !regionCapture.helpPresented
         }
         return true
     }
@@ -91,6 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         let file = NSMenu(title: "File")
         file.addItem(item("Pick Color", #selector(pickColor), key: "p", modifiers: [.command, .shift]))
+        file.addItem(item("Capture Screen Palette", #selector(capturePalette), key: "a", modifiers: [.command, .shift]))
         file.addItem(item("Paste Color into Library", #selector(paste(_:)), key: "v", modifiers: [.command, .shift]))
         file.addItem(.separator())
         file.addItem(item("Import Library…", #selector(importLibrary)))
@@ -119,6 +172,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let statusMenu = NSMenu()
         let pickItem = item("Pick Color   ⌃⌥C", #selector(pickColor))
         statusMenu.addItem(pickItem)
+        statusMenu.addItem(item("Capture Screen Palette", #selector(capturePalette)))
         statusMenu.addItem(item("Floating Picker", #selector(showFloating)))
         statusMenu.addItem(item("Color Library", #selector(showLibrary)))
         statusMenu.addItem(.separator())
