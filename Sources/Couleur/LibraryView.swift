@@ -272,7 +272,7 @@ private struct ColorTile: View {
                 Button("Delete color", role: .destructive) { store.delete(record.id) }
             }
             .overlay(alignment: .topTrailing) {
-                RemoveButton(label: "Delete color \(record.name)", revealed: hovered || selected, badge: true) { store.delete(record.id) }
+                RemoveButton(label: "Delete color \(record.name)", revealed: hovered, badge: true) { store.delete(record.id) }
                     .disabled(store.readOnly).padding(10)
             }
             .onHover { hovered = $0 }

@@ -180,7 +180,7 @@ private struct RecentSwatch: View {
             .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityAction(named: "Delete color") { store.delete(record.id) }
             .overlay(alignment: .topTrailing) {
-                RemoveButton(label: "Delete recent color \(record.name)", revealed: hovered || selected, compact: true, badge: true) {
+                RemoveButton(label: "Delete recent color \(record.name)", revealed: hovered, compact: true, badge: true) {
                     store.delete(record.id)
                 }.disabled(store.readOnly)
             }
