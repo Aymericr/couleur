@@ -41,12 +41,16 @@ The native sampler does not require this app to request Screen Recording or Acce
 Choose **Capture Screen Palette** from the File or menu-bar menu, the compact header, or the library toolbar. Drag a rectangle using macOS's screenshot selector; **Esc** cancels. Couleur hides its window during selection, then expands into the result:
 
 - Up to **five dominant colors**, ordered by area, with approximate percentages and a proportion strip.
+- **Suggested color roles**: background, surface, foreground, and accents for flat designs; main colors, accents, shadows, and highlights for textured images. Click a role to copy and save its color with an editable name and role metadata.
+- **Estimated linear gradients**, including multi-stop gradients within a larger image. Inspect the source region, copy CSS, or keep individual stops. Gradients are inferred from spatial changes, not assembled from unrelated swatches.
 - Up to **64 grouped shades**, sortable by area or hue.
 - The captured image, with a live color readout under the pointer. **Click anywhere in the image** to pick the exact full-resolution pixel.
 - Click a shade to **copy and save it** in the current copy format. A checkmark confirms the copy. Repeated clicks on the same color in that capture reuse its history entry.
-- **Save palette** keeps either the dominant colors or all the grouped shades in a named collection. Names and notes on already-picked, unfiled colors are preserved.
+- **Save palette** keeps suggested roles, dominant colors, or all the grouped shades in a named collection. Names and notes on already-picked, unfiled colors are preserved.
 
 Extraction uses a bounded image sample and population-weighted OKLab clustering. Representatives are colors found in that sample. Group percentages are estimates, not exact pixel counts; very small accents may be absent from the grouped palette. The image picker reads the original pixels independently, so you can still access every color in the captured area. Both paths convert to sRGB.
+
+Role analysis also considers flat connected regions, image edges, chroma, contrast, and position. It adapts to flat graphics versus textured images, but does not recognize objects or read text. Labels are suggestions, not a recovered design system. Linear gradient estimates must closely match a smooth region; radial/mesh gradients, heavily overlaid gradients, and subtle photographic shading may be omitted. The original CSS interpolation space and exact stops cannot be recovered reliably from a screenshot. Gradient CSS is copied on demand; keep individual stops to retain them in color history. Everything runs locally without an AI service or new dependencies. See [analysis design and references](docs/palette-analysis.md).
 
 The current image stays in memory until the next successful capture or app exit. Temporary screenshot files are removed after processing. **Saved colors and collections persist; screenshots are not retained in your library.** Capture colors remember the image dimensions and either the group's estimated area or the exact pixel coordinates within the image. The system screenshot selector does not report a reliable source app, so capture colors are labeled “Screen capture” rather than guessing one.
 

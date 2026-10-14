@@ -25,7 +25,10 @@ public struct PaletteImage: Sendable {
         let scale = min(1, 256 / Double(max(width, height)))
         let w = max(1, Int((Double(width) * scale).rounded()))
         let h = max(1, Int((Double(height) * scale).rounded()))
-        return try PaletteExtractor.extract(rgba: Self.rgba(cgImage, width: w, height: h))
+        let bytes = try Self.rgba(cgImage, width: w, height: h)
+        var palette = try PaletteExtractor.extract(rgba: bytes)
+        palette.analysis = try PaletteAnalyzer.analyze(rgba: bytes, width: w, height: h, palette: palette)
+        return palette
     }
 
     public func color(x: Int, y: Int) -> ColorValue? {

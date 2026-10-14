@@ -10,6 +10,7 @@ public struct PaletteColor: Equatable, Identifiable, Sendable {
 public struct ExtractedPalette: Equatable, Sendable {
     public var dominant: [PaletteColor]
     public var shades: [PaletteColor]
+    public var analysis = PaletteAnalysis()
 }
 
 public enum PaletteError: LocalizedError {

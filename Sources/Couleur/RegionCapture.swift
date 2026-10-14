@@ -8,11 +8,24 @@ struct ScreenPalette {
     let image: PaletteImage
     let colors: ExtractedPalette
 
-    func source(proportion: Double? = nil, x: Int? = nil, y: Int? = nil) -> ColorSource {
+    func source(proportion: Double? = nil, x: Int? = nil, y: Int? = nil, role: PaletteRole? = nil) -> ColorSource {
         var source = ColorSource(method: "Screen capture")
         source.capture = CaptureSource(id: id, width: image.width, height: image.height,
-                                       pixelX: x, pixelY: y, proportion: proportion)
+                                       pixelX: x, pixelY: y, proportion: proportion, suggestedRole: role)
         return source
+    }
+
+    func role(for value: ColorValue) -> PaletteRole? { colors.analysis.roles.first { $0.color.value == value }?.role }
+}
+
+enum CapturePaletteSelection {
+    case roles, dominant, shades
+    func colors(in capture: ScreenPalette) -> [PaletteColor] {
+        switch self {
+        case .roles: capture.colors.analysis.roles.map(\.color)
+        case .dominant: capture.colors.dominant
+        case .shades: capture.colors.shades
+        }
     }
 }
 

@@ -7,10 +7,13 @@ struct CapturePaletteView: View {
     let capture: ScreenPalette
     @State private var sort: PaletteOrder = .amount
     @State private var savePrompt = false
-    @State private var dominantOnly = true
+    @State private var saveSelection: CapturePaletteSelection = .roles
     @State private var paletteName = ""
     @State private var hoveredPixel: ImagePixel?
     @State private var selectedPixel: ImagePixel?
+    @State private var shownGradientID: String?
+    @State private var copiedGradientID: String?
+    @State private var gradientFeedbackTask: Task<Void, Never>?
 
     private var shades: [PaletteColor] {
         switch sort {
@@ -31,14 +34,16 @@ struct CapturePaletteView: View {
                     Text("Screen palette").font(.system(size: 20, weight: .semibold)).tracking(-0.4)
                     Spacer(minLength: 8)
                     Menu {
-                        Button("Dominant colors…") { beginSave(dominantOnly: true) }
-                        Button("All \(capture.colors.shades.count) shades…") { beginSave(dominantOnly: false) }
+                        Button("Suggested roles…") { beginSave(.roles) }.disabled(capture.colors.analysis.roles.isEmpty)
+                        Button("Dominant colors…") { beginSave(.dominant) }
+                        Button("All \(capture.colors.shades.count) shades…") { beginSave(.shades) }
                     } label: { Label("Save palette", systemImage: "folder.badge.plus") }
                         .menuStyle(.borderlessButton).fixedSize().font(.system(size: 11))
                         .disabled(store.readOnly).accessibilityLabel("Save captured palette")
                 }
                 VStack(spacing: 9) {
-                    CaptureImageView(image: capture.image, selectedPixel: selectedPixel, hover: { hoveredPixel = $0 }) { pixel in
+                    CaptureImageView(image: capture.image, selectedPixel: selectedPixel, highlightedRegion: nil,
+                                     hover: { hoveredPixel = $0 }) { pixel in
                         selectedPixel = pixel
                         store.keepCapturedColor(pixel.color, x: pixel.x, y: pixel.y)
                     }
@@ -58,9 +63,33 @@ struct CapturePaletteView: View {
                         Text("Click image to pick").foregroundStyle(.tertiary)
                     }.font(.system(size: 10)).foregroundStyle(.secondary).frame(height: 14)
                 }
+                if !capture.colors.analysis.roles.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        sectionTitle("Color roles", detail: "Suggested")
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 100, maximum: 180), spacing: 14)], alignment: .leading, spacing: 16) {
+                            ForEach(capture.colors.analysis.roles) { role in
+                                CaptureSwatch(store: store, captureID: capture.id, color: role.color, prominent: false, title: role.role.rawValue) {
+                                    selectedPixel = nil
+                                    store.keepCapturedColor(role.color.value, proportion: role.color.proportion)
+                                }.help(role.reason + " Click to copy and keep.")
+                            }
+                        }
+                        Text("Inferred from color, contrast, and placement. Names stay editable.")
+                            .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                if !capture.colors.analysis.gradients.isEmpty {
+                    VStack(alignment: .leading, spacing: 14) {
+                        sectionTitle("Gradients", detail: "Estimated · linear")
+                        ForEach(capture.colors.analysis.gradients) { gradient in
+                            gradientView(gradient)
+                        }
+                    }
+                }
                 VStack(alignment: .leading, spacing: 12) {
                     sectionTitle("Dominant colors", detail: "By area")
-                    HStack(alignment: .top, spacing: 10) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 10, alignment: .topLeading),
+                                             count: max(1, capture.colors.dominant.count)), alignment: .leading, spacing: 10) {
                         ForEach(capture.colors.dominant) { color in
                             CaptureSwatch(store: store, captureID: capture.id, color: color, prominent: true) {
                                 selectedPixel = nil
@@ -102,18 +131,80 @@ struct CapturePaletteView: View {
         }
         .alert("Save Palette", isPresented: $savePrompt) {
             TextField("Collection name", text: $paletteName)
-            Button("Save") { store.saveCapturePalette(name: paletteName, dominantOnly: dominantOnly) }
+            Button("Save") { store.saveCapturePalette(name: paletteName, selection: saveSelection) }
                 .disabled(paletteName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Keep \(dominantOnly ? capture.colors.dominant.count : capture.colors.shades.count) colors in a named collection.")
+            Text("Keep \(saveSelection.colors(in: capture).count) colors in a named collection.")
         }
+        .onDisappear { gradientFeedbackTask?.cancel() }
     }
 
-    private func beginSave(dominantOnly: Bool) {
-        self.dominantOnly = dominantOnly
+    private func beginSave(_ selection: CapturePaletteSelection) {
+        saveSelection = selection
         paletteName = "Screen palette · \(capture.createdAt.formatted(.dateTime.month(.abbreviated).day()))"
         savePrompt = true
+    }
+
+    private func gradientView(_ gradient: DetectedGradient) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            LinearGradient(stops: gradient.stops.map { .init(color: $0.color.color, location: $0.location) },
+                           startPoint: .leading, endPoint: .trailing)
+                .frame(height: 42).clipShape(RoundedRectangle(cornerRadius: 6)).modifier(SwatchRim(radius: 6))
+                .accessibilityLabel("Estimated linear gradient with \(gradient.stops.count) stops")
+            HStack {
+                Text("\(gradient.angle.formatted(.number.precision(.fractionLength(0))))° · \(gradient.stops.count) stops")
+                    .foregroundStyle(.secondary).monospacedDigit()
+                Spacer()
+                Button("Show region") { shownGradientID = gradient.id }.buttonStyle(.link)
+                    .popover(isPresented: Binding(get: { shownGradientID == gradient.id }, set: { if !$0 { shownGradientID = nil } })) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Gradient region").font(.system(size: 12, weight: .semibold))
+                            CaptureImageView(image: capture.image, selectedPixel: nil, highlightedRegion: gradient.region, hover: { _ in }) { pixel in
+                                store.keepCapturedColor(pixel.color, x: pixel.x, y: pixel.y)
+                            }.frame(width: 340, height: 220)
+                            Text("Estimated from this area. Click the image to keep an exact color.")
+                                .font(.system(size: 10)).foregroundStyle(.secondary)
+                        }.padding(16)
+                    }
+                Button {
+                    guard store.copyGradient(gradient) else { return }
+                    copiedGradientID = gradient.id
+                    gradientFeedbackTask?.cancel()
+                    gradientFeedbackTask = Task {
+                        try? await Task.sleep(for: .seconds(2))
+                        if !Task.isCancelled { copiedGradientID = nil }
+                    }
+                } label: {
+                    Label(copiedGradientID == gradient.id ? "Copied" : "Copy CSS", systemImage: copiedGradientID == gradient.id ? "checkmark" : "doc.on.doc")
+                        .frame(minWidth: 72)
+                }.buttonStyle(.bordered).controlSize(.small)
+            }.font(.system(size: 10))
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 86, maximum: 115), spacing: 8)], alignment: .leading, spacing: 8) {
+                ForEach(Array(gradient.stops.enumerated()), id: \.offset) { index, stop in
+                    Button {
+                        selectedPixel = nil
+                        store.keepCapturedColor(stop.color, name: "Gradient stop \(index + 1)")
+                    } label: {
+                        HStack(spacing: 4) {
+                            Swatch(value: stop.color).frame(width: 14, height: 14).modifier(SwatchRim(radius: 3))
+                                .overlay {
+                                    Image(systemName: "checkmark").font(.system(size: 8, weight: .semibold))
+                                        .frame(width: 14, height: 14).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 3))
+                                        .opacity(stopWasCopied(stop) ? 1 : 0)
+                                }
+                            Text(stop.color.hex).font(.system(size: 9, design: .monospaced))
+                        }
+                    }.buttonStyle(QuietButtonStyle()).help("Copy & keep stop \(index + 1) · \(stop.color.hex)")
+                        .accessibilityLabel("Gradient stop \(index + 1), \(stop.color.hex)")
+                        .accessibilityValue(stopWasCopied(stop) ? "Copied" : stop.color.formatted(store.copyFormat))
+                }
+            }
+        }
+    }
+    private func stopWasCopied(_ stop: GradientStop) -> Bool {
+        store.selected?.source.capture?.id == capture.id && store.selected?.value == stop.color
+            && store.copiedColorID != nil && store.copiedColorID == store.selectedID
     }
     private func sectionTitle(_ title: String, detail: String) -> some View {
         HStack {
@@ -134,6 +225,7 @@ private struct CaptureSwatch: View {
     let captureID: UUID
     let color: PaletteColor
     let prominent: Bool
+    var title: String? = nil
     let action: () -> Void
 
     private var selected: Bool { store.selected?.source.capture?.id == captureID && store.selected?.value == color.value }
@@ -145,6 +237,7 @@ private struct CaptureSwatch: View {
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 6) {
+                if let title { Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(.primary) }
                 Swatch(value: color.value).frame(height: prominent ? 66 : 42).modifier(SwatchRim(radius: 6))
                     .overlay {
                         RoundedRectangle(cornerRadius: 9).strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2).padding(-3)
@@ -160,7 +253,7 @@ private struct CaptureSwatch: View {
             }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
         }.buttonStyle(QuietButtonStyle())
             .help("Copy & keep \(color.value.hex) · about \(percentage) of the image")
-            .accessibilityLabel("\(color.value.hex), \(percentage) of capture")
+            .accessibilityLabel("\(title.map { $0 + ", " } ?? "")\(color.value.hex), \(percentage) of capture")
             .accessibilityValue(copied ? "Copied" : color.value.formatted(store.copyFormat))
             .accessibilityHint("Copy and save color")
             .accessibilityAddTraits(selected ? .isSelected : [])
@@ -178,12 +271,14 @@ private struct ImagePixel {
 private struct CaptureImageView: NSViewRepresentable {
     let image: PaletteImage
     let selectedPixel: ImagePixel?
+    let highlightedRegion: ImageRegion?
     let hover: (ImagePixel?) -> Void
     let pick: (ImagePixel) -> Void
     func makeNSView(context: Context) -> ImageView { ImageView() }
     func updateNSView(_ view: ImageView, context: Context) {
         view.image = image; view.hover = hover; view.pick = pick
         view.selectedPixel = selectedPixel; view.needsDisplay = true
+        view.highlightedRegion = highlightedRegion
     }
 
     final class ImageView: NSView {
@@ -191,6 +286,7 @@ private struct CaptureImageView: NSViewRepresentable {
         var hover: ((ImagePixel?) -> Void)?
         var pick: ((ImagePixel) -> Void)?
         var selectedPixel: ImagePixel?
+        var highlightedRegion: ImageRegion?
         private var tracking: NSTrackingArea?
         override var isFlipped: Bool { true }
         override var mouseDownCanMoveWindow: Bool { false }
@@ -206,6 +302,13 @@ private struct CaptureImageView: NSViewRepresentable {
             guard let image else { return }
             NSImage(cgImage: image.cgImage, size: .zero).draw(in: imageRect, from: .zero, operation: .sourceOver, fraction: 1,
                                                           respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
+            if let region = highlightedRegion {
+                let rect = NSRect(x: imageRect.minX + region.x * imageRect.width, y: imageRect.minY + region.y * imageRect.height,
+                                  width: region.width * imageRect.width, height: region.height * imageRect.height).insetBy(dx: 1, dy: 1)
+                let outline = NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3)
+                NSColor.black.withAlphaComponent(0.7).setStroke(); outline.lineWidth = 3; outline.stroke()
+                NSColor.white.setStroke(); outline.lineWidth = 1; outline.stroke()
+            }
             if let pixel = selectedPixel {
                 let rect = imageRect
                 let point = NSPoint(x: rect.minX + (CGFloat(pixel.x) + 0.5) / CGFloat(image.width) * rect.width,

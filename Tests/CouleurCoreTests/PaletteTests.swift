@@ -85,7 +85,7 @@ private func pixels(_ values: [(String, Int)]) -> [UInt8] {
 
 @Test func captureMetadataSurvivesExportAndOldLibrariesStillLoad() throws {
     var source = ColorSource(method: "Screen capture")
-    source.capture = CaptureSource(width: 640, height: 480, pixelX: 120, pixelY: 70, proportion: 0.32)
+    source.capture = CaptureSource(width: 640, height: 480, pixelX: 120, pixelY: 70, proportion: 0.32, suggestedRole: .accent)
     var library = ColorLibrary()
     library.colors = [SavedColor(name: "Red", value: ColorValue(red: 1, green: 0, blue: 0),
                                  createdAt: Date(timeIntervalSince1970: 1_800_000_000), source: source)]

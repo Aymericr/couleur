@@ -26,10 +26,13 @@ public struct CaptureSource: Codable, Equatable, Sendable {
     public var pixelX: Int?
     public var pixelY: Int?
     public var proportion: Double?
+    public var suggestedRole: PaletteRole?
 
-    public init(id: UUID = UUID(), width: Int, height: Int, pixelX: Int? = nil, pixelY: Int? = nil, proportion: Double? = nil) {
+    public init(id: UUID = UUID(), width: Int, height: Int, pixelX: Int? = nil, pixelY: Int? = nil, proportion: Double? = nil,
+                suggestedRole: PaletteRole? = nil) {
         self.id = id; self.width = width; self.height = height
         self.pixelX = pixelX; self.pixelY = pixelY; self.proportion = proportion
+        self.suggestedRole = suggestedRole
     }
 
     var isValid: Bool {

@@ -129,6 +129,9 @@ struct InspectorView: View {
             if let capture = record.source.capture {
                 VStack(alignment: .leading, spacing: 7) {
                     sourceRow("viewfinder", "\(capture.width) × \(capture.height) px capture")
+                    if let role = capture.suggestedRole {
+                        sourceRow("tag", "Suggested role: \(role.rawValue)")
+                    }
                     if let proportion = capture.proportion {
                         sourceRow("chart.pie", "About \(proportion.formatted(.percent.precision(.fractionLength(1)))) of the image")
                     }

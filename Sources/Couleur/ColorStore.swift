@@ -103,11 +103,12 @@ final class ColorStore: ObservableObject {
     }
 
     /// A capture swatch is saved on first use. Further clicks copy the same record.
-    func keepCapturedColor(_ value: ColorValue, proportion: Double? = nil, x: Int? = nil, y: Int? = nil) {
+    func keepCapturedColor(_ value: ColorValue, proportion: Double? = nil, x: Int? = nil, y: Int? = nil, name: String? = nil) {
         guard let capture = screenPalette else { return }
         let existing = library.colors.first { $0.source.capture?.id == capture.id && $0.value == value }
-        let record = existing ?? SavedColor(name: value.hex, value: value, createdAt: capture.createdAt,
-                                            source: capture.source(proportion: proportion, x: x, y: y))
+        let role = capture.role(for: value)
+        let record = existing ?? SavedColor(name: name ?? role?.rawValue ?? value.hex, value: value, createdAt: capture.createdAt,
+                                            source: capture.source(proportion: proportion, x: x, y: y, role: role))
         if existing == nil {
             guard commit({ $0.colors.insert(record, at: 0) }) else { return }
         }
@@ -115,7 +116,7 @@ final class ColorStore: ObservableObject {
         copy(record)
     }
 
-    func saveCapturePalette(name: String, dominantOnly: Bool) {
+    func saveCapturePalette(name: String, selection: CapturePaletteSelection) {
         guard let capture = screenPalette else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -125,7 +126,8 @@ final class ColorStore: ObservableObject {
             uniqueName = "\(trimmed) (\(suffix))"; suffix += 1
         }
         let collection = ColorCollection(name: uniqueName)
-        let colors = dominantOnly ? capture.colors.dominant : capture.colors.shades
+        let colors = selection.colors(in: capture)
+        guard !colors.isEmpty else { return }
         guard commit({ library in
             library.collections.append(collection)
             for color in colors {
@@ -136,12 +138,24 @@ final class ColorStore: ObservableObject {
                     library.colors[index].collectionID = collection.id
                     library.colors[index].updatedAt = Date()
                 } else {
-                    library.colors.insert(SavedColor(name: color.value.hex, value: color.value, createdAt: capture.createdAt,
-                                                     collectionID: collection.id, source: capture.source(proportion: color.proportion)), at: 0)
+                    let role = capture.role(for: color.value)
+                    library.colors.insert(SavedColor(name: role?.rawValue ?? color.value.hex, value: color.value, createdAt: capture.createdAt,
+                                                     collectionID: collection.id, source: capture.source(proportion: color.proportion, role: role)), at: 0)
                 }
             }
         }) else { return }
         notify("Saved \(colors.count) colors to \(uniqueName)")
+    }
+
+    @discardableResult
+    func copyGradient(_ gradient: DetectedGradient) -> Bool {
+        NSPasteboard.general.clearContents()
+        guard NSPasteboard.general.setString(gradient.css, forType: .string) else {
+            error = "Could not copy the gradient. Please try again."
+            return false
+        }
+        notify("Copied gradient CSS")
+        return true
     }
 
     func update(_ id: UUID, _ edit: (inout SavedColor) -> Void) {
