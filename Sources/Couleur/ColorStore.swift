@@ -23,8 +23,12 @@ final class ColorStore: ObservableObject {
     @Published var filter: LibraryFilter = .all
     @Published var search = ""
     @Published var sort: LibrarySort = .newest
-    @AppStorage("copyFormat") var copyFormat: CopyFormat = .hex
-    @AppStorage("autoCopy") var autoCopy = true
+    @Published var copyFormat: CopyFormat = CopyFormat(rawValue: UserDefaults.standard.string(forKey: "copyFormat") ?? "") ?? .hex {
+        didSet { UserDefaults.standard.set(copyFormat.rawValue, forKey: "copyFormat") }
+    }
+    @Published var autoCopy: Bool = UserDefaults.standard.object(forKey: "autoCopy") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(autoCopy, forKey: "autoCopy") }
+    }
     private let file: LibraryFile
 
     init(directory: URL? = nil) {
