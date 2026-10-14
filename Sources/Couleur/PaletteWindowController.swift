@@ -130,7 +130,7 @@ final class PaletteWindowController: NSWindowController, NSWindowDelegate {
 
     private func refreshCompact() {
         let root = FloatingView(store: store,
-            pick: { [weak self] in self?.pickColor(initiatedByPress: true) },
+            pick: { [weak self] pressed in self?.pickColor(initiatedByPress: pressed) },
             capture: { [weak self] in self?.capturePalette() },
             showLibrary: { [weak self] in self?.showLibrary() },
             close: { [weak self] in self?.panel.performClose(nil) },

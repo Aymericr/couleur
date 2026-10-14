@@ -8,7 +8,7 @@ struct CaptureAccessView: View {
 
     private var ready: Bool { capture.accessGranted && capture.captureFailure == nil }
     private var title: String {
-        if ready { return "Ready to capture" }
+        if ready { return "Ready to pick and capture" }
         if capture.accessGranted { return "Let’s try that capture again" }
         return "A palette from anywhere"
     }
@@ -109,9 +109,9 @@ struct CaptureAccessView: View {
     }
 
     private var description: String {
-        if ready { return "Choose an area of your screen to find its dominant colors and explore every shade." }
+        if ready { return "Pick exact screen pixels with the loupe, or choose an area to find its dominant colors and explore every shade." }
         if capture.accessGranted { return "macOS couldn’t return that image. Try selecting the area again. If you just enabled access, reopen the app first." }
-        return "\(capture.appName) needs screen access to read the colors in an area you select. Allow it in System Settings to get started."
+        return "Screen access enables the fine pixel loupe and palettes from any area you select. Allow \(capture.appName) in System Settings to get started."
     }
     private var primaryTitle: String {
         if capture.accessGranted { return ready ? "Capture an Area" : "Try Again" }

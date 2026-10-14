@@ -1,10 +1,13 @@
 import AppKit
 import CouleurCore
+import OSLog
 
 @MainActor
 final class ScreenPicker {
     private let sampler = NSColorSampler()
     private let store: ColorStore
+    private var loupe: ScreenLoupe?
+    private var task: Task<Void, Never>?
     var beforePick: (() -> Void)?
     var afterPick: (() -> Void)?
 
@@ -13,21 +16,52 @@ final class ScreenPicker {
     func pick(initiatedByPress: Bool = false) {
         guard !store.isSampling, !store.readOnly else { return }
         store.isSampling = true
+        let custom = ScreenLoupe.previewImageURL != nil || CGPreflightScreenCaptureAccess() ? ScreenLoupe() : nil
+        loupe = custom
+        // Install input tracking during mouse-down, before asynchronous capture
+        // preparation can miss a quick drag's release.
+        custom?.prepare(initiatedByPress: initiatedByPress)
         beforePick?()
-        Task { @MainActor [weak self] in
+        task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                self.loupe = nil
+                self.task = nil
+                self.store.isSampling = false
+                self.afterPick?()
+            }
+            // The quiet loupe uses the screen access already granted for area palettes.
+            // Picking still works through AppKit if access is absent or capture fails.
+            if let loupe = custom {
+                do {
+                    try await loupe.run { [weak self] value, point in
+                        guard let self else { return }
+                        self.store.add(value, source: self.source(at: point))
+                    }
+                    return
+                } catch {
+                    self.loupe = nil
+                    guard !Task.isCancelled, !loupe.isFinished else { return }
+                    Logger(subsystem: "com.aymeric.couleur", category: "ScreenPicker")
+                        .error("Screen loupe unavailable; using AppKit sampler: \(error.localizedDescription)")
+                }
+            }
             // Start during mouse-down for dragging. Menu/keyboard picks wait a frame for our windows to hide.
             if !initiatedByPress { try? await Task.sleep(for: .milliseconds(80)) }
-            guard let self else { return }
+            guard !Task.isCancelled else { return }
             repeat {
                 guard let value = await self.sampleValue() else { break }
-                let source = self.sourceAtPointer()
+                let source = self.source(at: NSEvent.mouseLocation)
                 self.store.add(value, source: source)
                 // Shift is sampled at selection time. Release it for the final pick, or press Esc to finish.
                 guard NSEvent.modifierFlags.contains(.shift) else { break }
             } while true
-            self.store.isSampling = false
-            self.afterPick?()
         }
+    }
+
+    func cancel() {
+        task?.cancel()
+        loupe?.cancel()
     }
 
     private func sampleValue() async -> ColorValue? {
@@ -40,8 +74,7 @@ final class ScreenPicker {
         }
     }
 
-    private func sourceAtPointer() -> ColorSource {
-        let pointer = NSEvent.mouseLocation
+    private func source(at pointer: CGPoint) -> ColorSource {
         // CG window rectangles use a top-left origin on the main display; AppKit uses bottom-left.
         let cgPoint = CGPoint(x: pointer.x, y: CGDisplayBounds(CGMainDisplayID()).height - pointer.y)
         let screen = NSScreen.screens.first { $0.frame.contains(pointer) }

@@ -4,13 +4,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 appearance="${1:-light}"
 if [[ "$appearance" != light && "$appearance" != dark ]]; then
-  echo "Usage: scripts/preview.sh [light|dark] [palette-image]" >&2
+  echo "Usage: scripts/preview.sh [light|dark] [palette-image | --loupe image]" >&2
   exit 1
 fi
 ./scripts/build.sh debug
 preview_app="build/Couleur Preview.app"
 ditto build/Couleur.app "$preview_app"
-python3 - "$appearance" "${2:-}" <<'PY'
+python3 - "$appearance" "${2:-}" "${3:-}" <<'PY'
 import datetime, json, pathlib, plistlib, sys, uuid
 root = pathlib.Path.cwd()
 folder = root / 'build/preview-data'
@@ -32,10 +32,11 @@ info.update(CFBundleIdentifier='com.aymeric.couleur.preview', CFBundleName='Coul
             CFBundleDisplayName='Couleur Preview', CouleurPreviewDirectory=str(folder),
             CouleurPreviewAppearance=sys.argv[1])
 if sys.argv[2]:
-    image = pathlib.Path(sys.argv[2]).resolve()
+    is_loupe = sys.argv[2] == '--loupe'
+    image = pathlib.Path(sys.argv[3] if is_loupe else sys.argv[2]).resolve()
     if not image.is_file():
         raise SystemExit(f'Image not found: {image}')
-    info['CouleurPreviewImage'] = str(image)
+    info['CouleurPreviewLoupeImage' if is_loupe else 'CouleurPreviewImage'] = str(image)
 p.write_bytes(plistlib.dumps(info))
 PY
 bash scripts/sign.sh "$preview_app" com.aymeric.couleur.preview

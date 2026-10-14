@@ -1,0 +1,25 @@
+{
+  "fill": {
+    "solid": "srgb:0.33,0.34,0.94,1.0"
+  },
+  "groups": [
+    {
+      "name": "Artwork",
+      "layers": [
+        {
+          "image-name": "Artwork.png",
+          "name": "Color to code",
+          "glass": false,
+          "position": {
+            "scale": 1.26,
+            "translation-in-points": [0, 0]
+          }
+        }
+      ],
+      "shadow": { "kind": "neutral", "opacity": 0 },
+      "specular": false,
+      "translucency": { "enabled": false, "value": 0 }
+    }
+  ],
+  "supported-platforms": { "squares": ["macOS"] }
+}

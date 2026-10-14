@@ -6,7 +6,7 @@ import SwiftUI
 struct FloatingView: View {
     static let size = NSSize(width: 256, height: 158)
     @ObservedObject var store: ColorStore
-    let pick: () -> Void
+    let pick: (Bool) -> Void
     let capture: () -> Void
     let showLibrary: () -> Void
     let close: () -> Void
@@ -89,7 +89,7 @@ struct FloatingView: View {
 
     private var valueAndFormat: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Button { if let current { store.copy(current) } else { pick() } } label: {
+            Button { if let current { store.copy(current) } else { pick(false) } } label: {
                 Text(current == nil ? "Pick a color" : compactCode)
                     .font(.system(size: current == nil ? 17 : (isShortCode ? 19 : 12), weight: .regular,
                                   design: current == nil ? .default : .monospaced))
@@ -182,7 +182,7 @@ private struct WindowDragRegion: NSViewRepresentable {
 
 /// Begin on mouse-down so the sampler can finish on the same drag's release.
 struct PickSurface: NSViewRepresentable {
-    var action: () -> Void
+    var action: (Bool) -> Void
     var enabled: Bool
     func makeNSView(context: Context) -> PickTrackingView { PickTrackingView() }
     func updateNSView(_ view: PickTrackingView, context: Context) {
@@ -193,16 +193,16 @@ struct PickSurface: NSViewRepresentable {
 
 @MainActor
 final class PickTrackingView: NSView {
-    var action: (() -> Void)?
+    var action: ((Bool) -> Void)?
     var enabled = true
     override var mouseDownCanMoveWindow: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    override func mouseDown(with event: NSEvent) { if enabled { action?() } }
+    override func mouseDown(with event: NSEvent) { if enabled { action?(true) } }
     override func resetCursorRects() { if enabled { addCursorRect(bounds, cursor: .crosshair) } }
     override func isAccessibilityElement() -> Bool { true }
     override func accessibilityRole() -> NSAccessibility.Role? { .button }
     override func accessibilityLabel() -> String? { "Pick from screen" }
     override func accessibilityPerformPress() -> Bool {
-        guard enabled else { return false }; action?(); return true
+        guard enabled else { return false }; action?(false); return true
     }
 }

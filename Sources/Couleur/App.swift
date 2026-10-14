@@ -30,6 +30,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     private func finishLaunching() {
+        // Use this build's artwork even while macOS retains an older icon cache.
+        if let url = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+           let icon = NSImage(contentsOf: url) {
+            NSApp.applicationIconImage = icon
+        }
         let arguments = ProcessInfo.processInfo.arguments
         var directory: URL? = if let index = arguments.firstIndex(of: "--data-directory"), arguments.indices.contains(index + 1) {
             URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
@@ -100,6 +105,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func importLibrary() { palette.showLibrary { [weak self] in self?.store.importLibrary() } }
     @objc private func exportLibrary() { palette.showLibrary { [weak self] in self?.store.exportLibrary() } }
     @objc private func revealLibrary() { store.revealLibrary() }
+    @objc private func showScreenAccess() {
+        regionCapture.checkAccess(explicit: true)
+        regionCapture.presentHelp?()
+    }
     @objc private func toggleAutoCopy() { store.autoCopy.toggle() }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -109,7 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return true
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
-    func applicationWillTerminate(_ notification: Notification) { regionCapture?.cancel() }
+    func applicationWillTerminate(_ notification: Notification) { picker?.cancel(); regionCapture?.cancel() }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         // Borderless panels do not advertise AppKit's standard closable style.
@@ -133,6 +142,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let app = NSMenu(title: "Couleur")
         app.addItem(item("About Couleur", #selector(showAbout)))
         app.addItem(.separator())
+        app.addItem(item("Screen Access…", #selector(showScreenAccess)))
         app.addItem(item("Reveal Library Folder", #selector(revealLibrary)))
         app.addItem(.separator())
         let hide = NSMenuItem(title: "Hide Couleur", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
@@ -180,10 +190,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @objc private func showAbout() {
-        NSApp.orderFrontStandardAboutPanel(options: [
+        var options: [NSApplication.AboutPanelOptionKey: Any] = [
             .applicationName: "Couleur",
             .applicationVersion: "1.0",
             .credits: NSAttributedString(string: "A home for the colors you find.\nBuilt for personal use. Inspired by Couleurs by Laurent Baumann.")
-        ])
+        ]
+        if let icon = NSApp.applicationIconImage { options[.applicationIcon] = icon }
+        NSApp.orderFrontStandardAboutPanel(options: options)
     }
 }
