@@ -26,6 +26,10 @@ final class ColorStore: ObservableObject {
     @Published var filter: LibraryFilter = .all
     @Published var search = ""
     @Published var sort: LibrarySort = .newest
+    let undoManager = UndoManager()
+    @Published var rememberWebsites = UserDefaults.standard.object(forKey: "rememberWebsites") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(rememberWebsites, forKey: "rememberWebsites") }
+    }
     @Published var copyFormat: CopyFormat = CopyFormat(rawValue: UserDefaults.standard.string(forKey: "copyFormat") ?? "") ?? .hex {
         didSet {
             UserDefaults.standard.set(copyFormat.rawValue, forKey: "copyFormat")
@@ -40,6 +44,7 @@ final class ColorStore: ObservableObject {
     init(directory: URL? = nil) {
         let folder = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Couleur", isDirectory: true)
         file = LibraryFile(url: folder.appendingPathComponent("library.json"))
+        undoManager.levelsOfUndo = 30
         do { library = try file.load(); selectedID = library.colors.first?.id }
         catch { readOnly = true; self.error = "Could not open your library: \(error.localizedDescription) Reveal the library folder to recover it, then relaunch." }
     }
@@ -51,7 +56,7 @@ final class ColorStore: ObservableObject {
         let colors = library.colors.filter { color in
             let matches: Bool
             switch filter {
-            case .capture: matches = false
+            case .capture, .captures: matches = false
             case .all: matches = true
             case .favorites: matches = color.favorite
             case .unfiled: matches = color.collectionID == nil
@@ -71,12 +76,73 @@ final class ColorStore: ObservableObject {
 
     var filterTitle: String {
         switch filter {
-        case .capture: "Screen Palette"
+        case .capture: screenPalette?.record.name ?? "Screen Palette"
+        case .captures: "Captures"
         case .all: "All colors"
         case .favorites: "Favorites"
         case .unfiled: "Unfiled"
         case .collection(let id): collectionName(id)
         }
+    }
+
+    var visibleCaptures: [SavedCapture] {
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return library.captures.filter { capture in
+            query.isEmpty || [capture.name, capture.source.appName ?? "", capture.source.windowTitle ?? "",
+                             capture.source.websiteURL ?? ""].contains { $0.localizedCaseInsensitiveContains(query) }
+        }.sorted { sort == .name ? $0.name.localizedStandardCompare($1.name) == .orderedAscending : $0.createdAt > $1.createdAt }
+    }
+
+    func captureImageURL(_ id: UUID) -> URL { file.captureURL(id) }
+
+    @discardableResult
+    func saveCapture(_ capture: ScreenPalette, imageData: Data) -> Bool {
+        guard !readOnly else { return false }
+        if library.captures.contains(where: { $0.id == capture.id }) { openCapture(capture.id); return true }
+        do { try file.saveImage(imageData, for: capture.record) }
+        catch { self.error = "Could not save the capture: \(error.localizedDescription)"; return false }
+        guard commit({ $0.captures.insert(capture.record, at: 0) }) else {
+            try? FileManager.default.removeItem(at: file.captureURL(capture.id))
+            return false
+        }
+        screenPalette = capture; filter = .capture; selectedID = nil; search = ""
+        notify("Capture saved")
+        return true
+    }
+
+    func openCapture(_ id: UUID) {
+        guard let record = library.captures.first(where: { $0.id == id }) else { return }
+        do {
+            let image = try PaletteImage(data: Data(contentsOf: file.captureURL(id)))
+            guard image.width == record.width && image.height == record.height else { throw CaptureFileError.invalidImage }
+            screenPalette = ScreenPalette(record: record, image: image)
+            filter = .capture; selectedID = nil
+        } catch { self.error = "Could not open this capture: \(error.localizedDescription)" }
+    }
+
+    func showCaptures() { filter = .captures; selectedID = nil }
+
+    func updateCapture(_ id: UUID, _ edit: (inout SavedCapture) -> Void) {
+        guard library.captures.contains(where: { $0.id == id }) else { return }
+        guard commit({ library in
+            guard let index = library.captures.firstIndex(where: { $0.id == id }) else { return }
+            edit(&library.captures[index])
+        }) else { return }
+        if screenPalette?.id == id, let record = library.captures.first(where: { $0.id == id }) { screenPalette?.record = record }
+    }
+
+    func rememberWebsite(_ website: String, forCapture id: UUID) {
+        guard let url = SavedCapture.webURL(website), library.captures.contains(where: { $0.id == id }) else { return }
+        guard commit({ library in
+            let index = library.captures.firstIndex { $0.id == id }!
+            guard library.captures[index].source.websiteURL == nil else { return }
+            library.captures[index].source.websiteURL = url.absoluteString
+            for i in library.colors.indices where library.colors[i].source.capture?.id == id {
+                if library.colors[i].sourceURL.isEmpty { library.colors[i].sourceURL = url.absoluteString }
+                library.colors[i].source.websiteURL = url.absoluteString
+            }
+        }) else { return }
+        if screenPalette?.id == id, let record = library.captures.first(where: { $0.id == id }) { screenPalette?.record = record }
     }
 
     func collectionName(_ id: UUID?) -> String { library.collections.first { $0.id == id }?.name ?? "Unfiled" }
@@ -91,15 +157,25 @@ final class ColorStore: ObservableObject {
         catch { self.error = "Could not save: \(error.localizedDescription)"; return false }
     }
 
-    func add(_ value: ColorValue, source: ColorSource) {
+    @discardableResult
+    func add(_ value: ColorValue, source: ColorSource) -> UUID? {
         let collectionID: UUID? = if case .collection(let id) = filter { id } else { nil }
         let record = SavedColor(name: value.hex, value: value, collectionID: collectionID, source: source)
         commit { $0.colors.insert(record, at: 0) }
-        guard library.colors.contains(where: { $0.id == record.id }) else { return }
+        guard library.colors.contains(where: { $0.id == record.id }) else { return nil }
         search = ""
-        if filter == .favorites || filter == .capture { filter = .all }
+        if filter == .favorites || filter == .capture || filter == .captures { filter = .all }
         selectedID = record.id
         if autoCopy { copy(record) } else { notify("Color saved") }
+        return record.id
+    }
+
+    func rememberWebsite(_ website: String, forColor id: UUID) {
+        guard let url = SavedCapture.webURL(website), library.colors.contains(where: { $0.id == id }) else { return }
+        update(id) {
+            if $0.sourceURL.isEmpty { $0.sourceURL = url.absoluteString }
+            if $0.source.websiteURL == nil { $0.source.websiteURL = url.absoluteString }
+        }
     }
 
     /// A capture swatch is saved on first use. Further clicks copy the same record.
@@ -166,15 +242,66 @@ final class ColorStore: ObservableObject {
     }
 
     func delete(_ id: UUID) {
-        guard let record = library.colors.first(where: { $0.id == id }) else { return }
-        let alert = NSAlert()
-        alert.messageText = "Delete \(record.name.isEmpty ? "this color" : record.name)?"
-        alert.informativeText = "This removes the color and its notes from your library. Export your library first if you want a permanent backup."
-        alert.addButton(withTitle: "Cancel")
-        alert.addButton(withTitle: "Delete Color")
-        guard alert.runModal() == .alertSecondButtonReturn else { return }
-        commit { $0.colors.removeAll { $0.id == id } }
-        if selectedID == id && !library.colors.contains(where: { $0.id == id }) { selectedID = visible.first?.id }
+        guard let index = library.colors.firstIndex(where: { $0.id == id }) else { return }
+        let record = library.colors[index], wasSelected = selectedID == id
+        guard commit({ $0.colors.removeAll { $0.id == id } }) else { return }
+        undoManager.registerUndo(withTarget: self) { store in
+            MainActor.assumeIsolated { store.restoreColor(record, at: index, select: wasSelected) }
+        }
+        undoManager.setActionName("Delete Color")
+        if wasSelected { selectedID = visible.first?.id }
+        notify("Color removed · ⌘Z to undo")
+    }
+
+    private func restoreColor(_ record: SavedColor, at index: Int, select: Bool) {
+        guard !library.colors.contains(where: { $0.id == record.id }) else { return }
+        var restored = record
+        if let collection = restored.collectionID, !library.collections.contains(where: { $0.id == collection }) { restored.collectionID = nil }
+        guard commit({ $0.colors.insert(restored, at: min(index, $0.colors.count)) }) else { return }
+        undoManager.registerUndo(withTarget: self) { store in MainActor.assumeIsolated { store.delete(record.id) } }
+        undoManager.setActionName("Delete Color")
+        if select { selectedID = record.id }
+        notify("Color restored")
+    }
+
+    func deleteCapture(_ id: UUID) {
+        guard !readOnly, !isExtracting, let index = library.captures.firstIndex(where: { $0.id == id }) else { return }
+        let record = library.captures[index], wasOpen = screenPalette?.id == id && filter == .capture
+        let original = file.captureURL(id)
+        var trashURL: NSURL?
+        do {
+            if FileManager.default.fileExists(atPath: original.path) {
+                try FileManager.default.trashItem(at: original, resultingItemURL: &trashURL)
+            }
+        } catch { self.error = "Could not remove this capture: \(error.localizedDescription)"; return }
+        guard commit({ $0.captures.removeAll { $0.id == id } }) else {
+            if let trashURL { try? FileManager.default.moveItem(at: trashURL as URL, to: original) }
+            return
+        }
+        let trashedImage = trashURL as URL?
+        undoManager.registerUndo(withTarget: self) { store in
+            MainActor.assumeIsolated { store.restoreCapture(record, at: index, imageInTrash: trashedImage, reopen: wasOpen) }
+        }
+        undoManager.setActionName("Delete Capture")
+        if screenPalette?.id == id { screenPalette = nil }
+        if filter == .capture { showCaptures() }
+        notify("Capture removed · ⌘Z to undo")
+    }
+
+    private func restoreCapture(_ record: SavedCapture, at index: Int, imageInTrash: URL?, reopen: Bool) {
+        guard !library.captures.contains(where: { $0.id == record.id }) else { return }
+        let original = file.captureURL(record.id)
+        do {
+            if let imageInTrash { try FileManager.default.moveItem(at: imageInTrash, to: original) }
+        } catch { self.error = "Could not restore the capture image: \(error.localizedDescription)"; return }
+        guard commit({ $0.captures.insert(record, at: min(index, $0.captures.count)) }) else {
+            if let imageInTrash { try? FileManager.default.moveItem(at: original, to: imageInTrash) }
+            return
+        }
+        undoManager.registerUndo(withTarget: self) { store in MainActor.assumeIsolated { store.deleteCapture(record.id) } }
+        undoManager.setActionName("Delete Capture")
+        if reopen { openCapture(record.id) }
+        notify("Capture restored")
     }
 
     func addCollection(_ name: String) {
@@ -246,14 +373,14 @@ final class ColorStore: ObservableObject {
     func exportLibrary() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]; panel.nameFieldStringValue = "Couleur-library.json"
-        panel.message = "Export all colors, collections, and source history."
+        panel.message = "Export all colors, collections, captures, and original images."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             // Never allow an export to overwrite the live library or its recovery copy.
             guard ![file.url.standardizedFileURL, file.backupURL.standardizedFileURL].contains(url.standardizedFileURL) else {
                 error = "Choose a location outside the live library files."; return
             }
-            try LibraryFile.encode(library).write(to: url, options: .atomic); notify("Library exported")
+            try file.archive(library).encoded().write(to: url, options: .atomic); notify("Library exported")
         } catch { self.error = error.localizedDescription }
     }
 
@@ -263,18 +390,28 @@ final class ColorStore: ObservableObject {
         panel.message = "Merge a Couleur backup. Your existing colors are kept."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            let incoming = try LibraryFile.decode(Data(contentsOf: url))
-            commit { library in
+            let archive = try LibraryArchive.decode(Data(contentsOf: url))
+            let incoming = archive.library
+            let captures = incoming.captures.filter { candidate in !library.captures.contains { $0.id == candidate.id } }
+            var written: [URL] = []
+            var imported = false
+            defer { if !imported { for url in written { try? FileManager.default.removeItem(at: url) } } }
+            for capture in captures {
+                try file.saveImage(archive.images[capture.id.uuidString]!, for: capture)
+                written.append(file.captureURL(capture.id))
+            }
+            imported = commit { library in
                 let collectionIDs = Set(library.collections.map(\.id))
                 library.collections += incoming.collections.filter { !collectionIDs.contains($0.id) }
                 let colorIDs = Set(library.colors.map(\.id))
                 library.colors += incoming.colors.filter { !colorIDs.contains($0.id) }
+                library.captures += captures
             }
         } catch { self.error = "Could not import: \(error.localizedDescription)" }
     }
 }
 
-enum LibraryFilter: Hashable { case all, favorites, unfiled, collection(UUID), capture }
+enum LibraryFilter: Hashable { case all, favorites, unfiled, collection(UUID), capture, captures }
 enum LibrarySort: String, CaseIterable, Identifiable {
     case newest = "Newest first", name = "Name", hue = "Hue"
     var id: String { rawValue }

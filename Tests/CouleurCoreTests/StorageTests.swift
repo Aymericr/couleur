@@ -64,3 +64,17 @@ private func exampleLibrary() -> ColorLibrary {
     library = exampleLibrary(); library.colors[0].source.x = 1e300
     #expect(throws: LibraryError.self) { try library.validate() }
 }
+
+@Test func olderLibrariesMigrateWithoutLosingColorsOrMetadata() throws {
+    let original = exampleLibrary()
+    var json = try #require(JSONSerialization.jsonObject(with: LibraryFile.encode(original)) as? [String: Any])
+    json["version"] = 1
+    json.removeValue(forKey: "captures")
+    let data = try JSONSerialization.data(withJSONObject: json)
+    let migrated = try LibraryFile.decode(data)
+    #expect(migrated.version == 2)
+    #expect(migrated.colors == original.colors)
+    #expect(migrated.collections == original.collections)
+    #expect(migrated.captures.isEmpty)
+    #expect(try LibraryArchive.decode(data).library == migrated)
+}

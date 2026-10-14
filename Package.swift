@@ -8,6 +8,7 @@ let package = Package(
     targets: [
         .target(name: "CouleurCore"),
         .executableTarget(name: "Couleur", dependencies: ["CouleurCore"]),
-        .testTarget(name: "CouleurCoreTests", dependencies: ["CouleurCore"])
+        .testTarget(name: "CouleurCoreTests", dependencies: ["CouleurCore"]),
+        .testTarget(name: "CouleurTests", dependencies: ["Couleur", "CouleurCore"])
     ]
 )

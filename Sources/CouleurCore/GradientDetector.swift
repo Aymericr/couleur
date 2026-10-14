@@ -1,17 +1,17 @@
 import Foundation
 import simd
 
-public struct ImageRegion: Equatable, Sendable {
+public struct ImageRegion: Codable, Equatable, Sendable {
     /// Normalized image coordinates, measured from the top left.
     public let x: Double, y: Double, width: Double, height: Double
 }
 
-public struct GradientStop: Equatable, Sendable {
+public struct GradientStop: Codable, Equatable, Sendable {
     public let color: ColorValue
     public let location: Double
 }
 
-public struct DetectedGradient: Equatable, Identifiable, Sendable {
+public struct DetectedGradient: Codable, Equatable, Identifiable, Sendable {
     public let stops: [GradientStop]
     /// CSS convention: 0 degrees points up, 90 right, 180 down.
     public let angle: Double

@@ -23,6 +23,7 @@ struct LibrarySidebar: View {
                 }
                 Section("Library") {
                     row("All Colors", icon: "square.grid.2x2", filter: .all, count: store.library.colors.count)
+                    row("Captures", icon: "rectangle.stack", filter: .captures, count: store.library.captures.count)
                     row("Favorites", icon: "star", filter: .favorites, count: store.library.colors.filter(\.favorite).count)
                     row("Unfiled", icon: "tray", filter: .unfiled, count: store.library.colors.filter { $0.collectionID == nil }.count)
                 }
@@ -47,6 +48,7 @@ struct LibrarySidebar: View {
                 Spacer(minLength: 2)
                 Menu {
                     Toggle("Copy automatically after picking", isOn: $store.autoCopy)
+                    Toggle("Remember source websites", isOn: $store.rememberWebsites)
                     Divider()
                     Button("Paste color from clipboard", action: store.paste)
                     Divider()
@@ -100,17 +102,19 @@ struct LibraryView: View {
                 } else if let capture = store.screenPalette {
                     CapturePaletteView(store: store, capture: capture).id(capture.id)
                 } else { emptyState }
-            } else if store.visible.isEmpty { emptyState }
+            } else if store.filter == .captures { CaptureCatalogView(store: store, capture: { capture.capture() }) }
+            else if store.visible.isEmpty { emptyState }
             else { colorGrid }
             HStack(spacing: 6) {
-                if store.filter == .capture { Text("sRGB") }
+                if store.filter == .capture { Text("Saved on this Mac") }
+                else if store.filter == .captures { Text("\(store.visibleCaptures.count) \(store.visibleCaptures.count == 1 ? "capture" : "captures")") }
                 else { Text("\(store.visible.count.formatted()) \(store.visible.count == 1 ? "color" : "colors")") }
                 Spacer()
                 if let message = store.message {
                     Image(systemName: "checkmark").font(.system(size: 10, weight: .medium))
                     Text(message)
                 } else {
-                    Text(store.filter == .capture ? "Click a color to copy & keep" : "Click a color to copy")
+                    Text(store.filter == .capture ? "Click a color to copy & keep" : store.filter == .captures ? "Images and palettes, together" : "Click a color to copy")
                 }
             }.font(.system(size: 11)).foregroundStyle(.secondary)
                 .padding(.horizontal, 22).frame(height: 32)
@@ -171,6 +175,7 @@ struct LibraryView: View {
         return "Pick anywhere on your screen.\nEvery color is remembered."
     }
     private func selectFirstVisible() {
+        if store.filter == .captures { store.selectedID = nil; return }
         guard store.filter != .capture else { return }
         if !store.visible.contains(where: { $0.id == store.selectedID }) { store.selectedID = store.visible.first?.id }
     }
@@ -212,7 +217,7 @@ private struct ColorTile: View {
                         RoundedRectangle(cornerRadius: 11).strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2)
                             .padding(-4)
                     }
-                    .overlay(alignment: .topTrailing) {
+                    .overlay(alignment: .topLeading) {
                         if record.favorite {
                             Image(systemName: "star.fill").font(.system(size: 9, weight: .medium))
                                 .frame(width: 22, height: 22).background(.regularMaterial, in: Circle()).padding(7)
@@ -247,12 +252,12 @@ private struct ColorTile: View {
             .background(.primary.opacity(hovered ? 0.025 : 0), in: RoundedRectangle(cornerRadius: 11))
             .contentShape(Rectangle())
         }.buttonStyle(QuietButtonStyle())
-            .onHover { hovered = $0 }
             .accessibilityLabel("\(record.name), \(record.value.hex)")
             .accessibilityValue(copied ? "Copied" : record.value.formatted(store.copyFormat))
             .accessibilityHint("Click to copy \(store.copyFormat.rawValue)")
             .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityAction(named: "Copy color") { store.copy(record) }
+            .accessibilityAction(named: "Delete color") { store.delete(record.id) }
             .help("\(record.source.appName.map { "Picked from \($0) · " } ?? "")Click to copy \(store.copyFormat.rawValue)")
             .contextMenu {
                 Button("Copy \(store.copyFormat.rawValue)") { store.copy(record) }
@@ -264,7 +269,12 @@ private struct ColorTile: View {
                     ForEach(store.library.collections) { collection in Button(collection.name) { store.update(record.id) { $0.collectionID = collection.id } } }
                 }
                 Divider()
-                Button("Delete color…", role: .destructive) { store.delete(record.id) }
+                Button("Delete color", role: .destructive) { store.delete(record.id) }
             }
+            .overlay(alignment: .topTrailing) {
+                RemoveButton(label: "Delete color \(record.name)", revealed: hovered || selected, badge: true) { store.delete(record.id) }
+                    .disabled(store.readOnly).padding(10)
+            }
+            .onHover { hovered = $0 }
     }
 }

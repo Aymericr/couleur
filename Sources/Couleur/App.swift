@@ -80,8 +80,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                         let image = try PaletteImage(data: Data(contentsOf: URL(fileURLWithPath: path)))
                         return try (image, image.extract())
                     }.value
-                    store.screenPalette = ScreenPalette(image: result.0, colors: result.1)
-                    store.selectedID = nil
+                    let imageData = try Data(contentsOf: URL(fileURLWithPath: path))
+                    let capture = ScreenPalette(image: result.0, colors: result.1, source: ColorSource(method: "Design preview"))
+                    _ = store.saveCapture(capture, imageData: imageData)
                 } catch { store.error = error.localizedDescription }
                 store.isExtracting = false
             }
@@ -165,6 +166,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         for (title, action, key) in [("Undo", Selector(("undo:")), "z"), ("Cut", #selector(NSText.cut(_:)), "x"), ("Copy", #selector(NSText.copy(_:)), "c"), ("Paste", #selector(NSText.paste(_:)), "v"), ("Select All", #selector(NSText.selectAll(_:)), "a")] {
             edit.addItem(NSMenuItem(title: title, action: action, keyEquivalent: key))
         }
+        let redo = NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        edit.insertItem(redo, at: 1)
         edit.addItem(.separator())
         edit.addItem(item("Find Colors", #selector(findColors), key: "f"))
         let editRoot = NSMenuItem(); editRoot.submenu = edit; main.addItem(editRoot)

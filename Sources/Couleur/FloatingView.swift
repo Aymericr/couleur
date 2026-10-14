@@ -123,6 +123,7 @@ struct FloatingView: View {
             }
             Divider()
             Toggle("Copy automatically", isOn: $store.autoCopy)
+            Toggle("Remember source websites", isOn: $store.rememberWebsites)
             Toggle("Keep on top", isOn: Binding(get: { isPinned }, set: { _ in togglePin() }))
             Divider()
             Button("Paste color from clipboard", action: store.paste)
@@ -142,22 +143,7 @@ struct FloatingView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ForEach(store.recent.prefix(6)) { record in
-                    Button {
-                        store.selectedID = record.id
-                        store.copy(record)
-                    } label: {
-                        Swatch(value: record.value).frame(width: 20, height: 20)
-                            .modifier(SwatchRim(radius: 5))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 7)
-                                    .strokeBorder(.primary.opacity(current?.id == record.id ? 0.30 : 0), lineWidth: 1)
-                                    .padding(-2.5)
-                            }
-                            .frame(width: 24, height: 28)
-                    }.buttonStyle(QuietButtonStyle())
-                        .help("Copy \(record.name) · \(record.value.hex)")
-                        .accessibilityLabel("Copy recent color \(record.name)")
-                        .accessibilityAddTraits(current?.id == record.id ? .isSelected : [])
+                    RecentSwatch(store: store, record: record, selected: current?.id == record.id)
                 }
                 Spacer(minLength: 0)
             }
@@ -167,6 +153,38 @@ struct FloatingView: View {
                     .frame(width: 24, height: 28)
             }.buttonStyle(QuietButtonStyle()).help("Open color library · ⌘1").accessibilityLabel("Expand library")
         }
+    }
+}
+
+private struct RecentSwatch: View {
+    @ObservedObject var store: ColorStore
+    let record: SavedColor
+    let selected: Bool
+    @State private var hovered = false
+
+    var body: some View {
+        Button {
+            store.selectedID = record.id
+            store.copy(record)
+        } label: {
+            Swatch(value: record.value).frame(width: 20, height: 20)
+                .modifier(SwatchRim(radius: 5))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 7)
+                        .strokeBorder(.primary.opacity(selected ? 0.30 : 0), lineWidth: 1).padding(-2.5)
+                }
+                .frame(width: 24, height: 34)
+        }.buttonStyle(QuietButtonStyle())
+            .help("Copy \(record.name) · \(record.value.hex)")
+            .accessibilityLabel("Copy recent color \(record.name)")
+            .accessibilityAddTraits(selected ? .isSelected : [])
+            .accessibilityAction(named: "Delete color") { store.delete(record.id) }
+            .overlay(alignment: .topTrailing) {
+                RemoveButton(label: "Delete recent color \(record.name)", revealed: hovered || selected, compact: true, badge: true) {
+                    store.delete(record.id)
+                }.disabled(store.readOnly)
+            }
+            .onHover { hovered = $0 }
     }
 }
 

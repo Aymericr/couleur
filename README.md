@@ -12,6 +12,7 @@ The app opens as a **256 × 158 pt floating palette**: a small color well beside
 - Alternatively, click the eyedropper, then click a color, or press **⌃⌥C** from any app.
 - **Hold Shift when selecting** to keep the sampler open and collect more colors. Release Shift for the final selection, or press **Esc** to finish. Each selected color gets its own history entry; the latest is copied.
 - **Click the color code** to copy it again. Click a recent swatch to select and copy it.
+- Hover a recent swatch or library color for its small **×**. Removal is immediate; **⌘Z** restores it with its name, notes, and source. **⌘⇧Z** redoes the removal.
 - Use the **format menu** beside the code to change its encoding. **Keep on top** is in the same menu.
 - The **expand button at the bottom right** unfolds the same window into the full library. The **Compact Picker** toolbar button (or **⌘2**) folds it back to its original position. Search, selection, and sidebar state are preserved. The transition respects **Reduce Motion**.
 - The **capture icon in the header** (or **⌘⇧A** while Couleur is active) lets you drag a screen area and explore its palette.
@@ -31,8 +32,11 @@ Every pick is saved immediately and kept across app restarts, with no history li
 - See the pick time, source app and bundle ID, display, and screen coordinates.
 - Add notes and a source URL by hand.
 - Import or export a complete JSON backup through **Library options** or the File menu.
+- Browse **Captures** for saved images and their palettes. Rename captures, search by website or app, and return to the original page through its source link.
 
-Screen metadata is best effort: the source app is resolved from the frontmost normal window under the pointer. Window titles are only saved when macOS supplies them, and can be absent without Screen Recording permission. Browser URLs are not read automatically. Clipboard imports are labeled as pasted colors. Screen coordinates use the Core Graphics origin at the top-left of the primary display and may be negative on other displays.
+Screen metadata is best effort: the source app is resolved from the normal window under the pointer, or the window containing the captured rectangle. A selection spanning multiple windows has no single attributed source. Window titles are only saved when macOS supplies them, and can be absent without Screen Recording permission. Clipboard imports are labeled as pasted colors. Screen coordinates use the Core Graphics origin at the top-left of the primary display and may be negative on other displays.
+
+**Remember source websites** is enabled initially and can be changed in either options menu. Couleur reads the current tab in the matching window of Safari or supported Chromium browsers (Chrome, Edge, Brave, Chromium, Vivaldi). macOS may ask for **Automation** access to that browser. It checks both window bounds and title before recording a URL, skips Chromium incognito windows, and only stores HTTP(S) links without embedded credentials. It does not read browsing history or execute page JavaScript. A denied request, unsupported browser, or changed tab leaves the website empty; the source link remains editable. Browser lookup runs off the main thread and never delays saving or copying a color.
 
 Screen picking uses a compact circular loupe with a fine grid and an outlined center pixel. It takes a temporary snapshot of each display so the visible pixel and the saved sRGB value agree. Arrow keys refine the selection one source pixel at a time. The snapshots stay in memory and disappear when picking ends. Canceling with Esc never creates an entry or changes the clipboard; previously collected colors remain saved during a Shift session. Without screen access, the native macOS sampler remains available without requiring Accessibility permission.
 
@@ -47,12 +51,14 @@ Choose **Capture Screen Palette** from the File or menu-bar menu, the compact he
 - The captured image, with a live color readout under the pointer. **Click anywhere in the image** to pick the exact full-resolution pixel.
 - Click a shade to **copy and save it** in the current copy format. A checkmark confirms the copy. Repeated clicks on the same color in that capture reuse its history entry.
 - **Save palette** keeps suggested roles, dominant colors, or all the grouped shades in a named collection. Names and notes on already-picked, unfiled colors are preserved.
+- Every successful capture is **saved automatically**, including the original image, all grouped shades, roles, gradients, capture date, and available source metadata. Open it again from **Captures**, including after restarting the app. A capture stays together as one palette; individual colors enter All Colors when you choose to keep them.
+- Use **×** in the capture header or on a gallery thumbnail to remove it. **⌘Z** restores the capture and image during the session; removed images go to the Mac's Trash. Colors already kept in your library are independent and retain their source metadata.
 
 Extraction uses a bounded image sample and population-weighted OKLab clustering. Representatives are colors found in that sample. Group percentages are estimates, not exact pixel counts; very small accents may be absent from the grouped palette. The image picker reads the original pixels independently, so you can still access every color in the captured area. Both paths convert to sRGB.
 
 Role analysis also considers flat connected regions, image edges, chroma, contrast, and position. It adapts to flat graphics versus textured images, but does not recognize objects or read text. Labels are suggestions, not a recovered design system. Linear gradient estimates must closely match a smooth region; radial/mesh gradients, heavily overlaid gradients, and subtle photographic shading may be omitted. The original CSS interpolation space and exact stops cannot be recovered reliably from a screenshot. Gradient CSS is copied on demand; keep individual stops to retain them in color history. Everything runs locally without an AI service or new dependencies. See [analysis design and references](docs/palette-analysis.md).
 
-The current image stays in memory until the next successful capture or app exit. Temporary screenshot files are removed after processing. **Saved colors and collections persist; screenshots are not retained in your library.** Capture colors remember the image dimensions and either the group's estimated area or the exact pixel coordinates within the image. The system screenshot selector does not report a reliable source app, so capture colors are labeled “Screen capture” rather than guessing one.
+Original images are stored locally in the library's `captures` folder. Temporary screenshot files are removed after processing. The catalog stores lightweight palette metadata and loads thumbnails on demand; editing a color does not rewrite screenshots. Capture colors remember the image dimensions and either the group's estimated area or the exact pixel coordinates within the image, alongside the available app and website. Nothing is uploaded.
 
 ### Screen access
 
@@ -89,7 +95,7 @@ Requires **macOS 14 or later**, Xcode command-line tools, and a Swift 6 toolchai
 This builds and signs `Couleur.app`, installs it in `/Applications`, and opens the compact picker. The original `/Applications/Couleurs.app` is a separate app. For a user-only install, run `./scripts/install.sh "$HOME/Applications"`. Quit Couleur before updating.
 
 ```sh
-swift test                     # Colors, palette extraction, pixel picking, storage, and recovery
+swift test                     # Colors, palettes, catalog persistence, deletion, undo, and source attribution
 ./scripts/build.sh debug        # Build a local .app
 open build/Couleur.app          # Compact picker
 open build/Couleur.app --args --library
@@ -123,17 +129,18 @@ Your data lives outside the repository and app bundle:
 ```text
 ~/Library/Application Support/Couleur/library.json
 ~/Library/Application Support/Couleur/library.backup.json
+~/Library/Application Support/Couleur/captures/<capture-id>.png
 ```
 
-Writes are atomic. Before each successful change, the previous valid file is saved as `library.backup.json`. The backup is the previous version, not a full revision archive; export the library for independent backups. Reinstalling the app keeps the library. **Reveal library folder** is available in the app and library menus.
+Writes are atomic. Before each successful change, the previous valid catalog is saved as `library.backup.json`. The backup is the previous version, not a full revision archive, and references the images beside it. **Export library** creates a portable JSON archive containing the catalog and every original capture image. Reinstalling the app keeps the library. **Reveal library folder** is available in the app and library menus.
 
-A damaged or unsupported file opens in read-only recovery mode and is never silently replaced with an empty library. To recover: quit Couleur, keep a copy of the damaged file, replace `library.json` with a valid export or the backup, and relaunch. Imports merge by UUID, preserving existing records with the same identity. Removing a collection moves its colors to Unfiled; deleting a color requires confirmation.
+A damaged or unsupported file opens in read-only recovery mode and is never silently replaced with an empty library. To recover: quit Couleur, keep a copy of the damaged file and capture images, replace `library.json` with the previous catalog backup, and relaunch. Portable exports are restored through **Import library** and merge by UUID, preserving existing records with the same identity. Version 1 color libraries migrate to version 2 without losing colors or metadata; older app builds refuse to overwrite the newer format. Removing a collection moves its colors to Unfiled. Color and capture deletions support native Undo/Redo until the app quits.
 
 ## Structure
 
 `CouleurCore` contains sRGB values, format conversion, parsing, perceptual palette extraction, color-managed image sampling, the versioned data model, and atomic file persistence. `Couleur` contains the shared native window, compact picker, library, region-capture workflow and permission guide, screen-source lookup, global shortcut, and clipboard behavior. Tests exercise the core without requiring display capture, UI permissions, or access to your real library.
 
-GitHub Actions runs the core tests and builds the app on macOS. Hosted CI results are independent of local validation.
+GitHub Actions runs the core and catalog tests and builds the app on macOS. Hosted CI results are independent of local validation.
 
 ## Acknowledgment
 

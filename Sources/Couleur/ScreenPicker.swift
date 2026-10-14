@@ -16,6 +16,7 @@ final class ScreenPicker {
     func pick(initiatedByPress: Bool = false) {
         guard !store.isSampling, !store.readOnly else { return }
         store.isSampling = true
+        let sourceWindows = ScreenSource.windows()
         let custom = ScreenLoupe.previewImageURL != nil || CGPreflightScreenCaptureAccess() ? ScreenLoupe() : nil
         loupe = custom
         // Install input tracking during mouse-down, before asynchronous capture
@@ -36,7 +37,7 @@ final class ScreenPicker {
                 do {
                     try await loupe.run { [weak self] value, point in
                         guard let self else { return }
-                        self.store.add(value, source: self.source(at: point))
+                        self.keep(value, at: point, windows: sourceWindows)
                     }
                     return
                 } catch {
@@ -51,8 +52,7 @@ final class ScreenPicker {
             guard !Task.isCancelled else { return }
             repeat {
                 guard let value = await self.sampleValue() else { break }
-                let source = self.source(at: NSEvent.mouseLocation)
-                self.store.add(value, source: source)
+                self.keep(value, at: NSEvent.mouseLocation, windows: sourceWindows)
                 // Shift is sampled at selection time. Release it for the final pick, or press Esc to finish.
                 guard NSEvent.modifierFlags.contains(.shift) else { break }
             } while true
@@ -74,24 +74,15 @@ final class ScreenPicker {
         }
     }
 
-    private func source(at pointer: CGPoint) -> ColorSource {
-        // CG window rectangles use a top-left origin on the main display; AppKit uses bottom-left.
-        let cgPoint = CGPoint(x: pointer.x, y: CGDisplayBounds(CGMainDisplayID()).height - pointer.y)
-        let screen = NSScreen.screens.first { $0.frame.contains(pointer) }
-        var source = ColorSource(displayName: screen?.localizedName, x: cgPoint.x, y: cgPoint.y)
-        guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return source }
-        for window in windows {
-            guard let pid = window[kCGWindowOwnerPID as String] as? Int32, pid != ProcessInfo.processInfo.processIdentifier,
-                  let layer = window[kCGWindowLayer as String] as? Int, layer == 0,
-                  let bounds = window[kCGWindowBounds as String] as? [String: Double],
-                  let x = bounds["X"], let y = bounds["Y"], let width = bounds["Width"], let height = bounds["Height"],
-                  CGRect(x: x, y: y, width: width, height: height).contains(cgPoint) else { continue }
-            let app = NSRunningApplication(processIdentifier: pid)
-            source.appName = app?.localizedName ?? window[kCGWindowOwnerName as String] as? String
-            source.bundleIdentifier = app?.bundleIdentifier
-            source.windowTitle = window[kCGWindowName as String] as? String
-            break
+    private func keep(_ value: ColorValue, at pointer: CGPoint, windows: [SourceWindow]) {
+        let point = ScreenSource.cgPoint(pointer)
+        let window = windows.first { $0.bounds.contains(point) }
+        let source = ScreenSource.source(at: point, window: window)
+        guard let id = store.add(value, source: source), store.rememberWebsites, let window else { return }
+        Task { [weak store] in
+            if let website = await BrowserSource.website(for: window), store?.rememberWebsites == true {
+                store?.rememberWebsite(website, forColor: id)
+            }
         }
-        return source
     }
 }

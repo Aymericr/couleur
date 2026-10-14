@@ -18,6 +18,8 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
     private var pickItem: NSToolbarItem?
     private var captureItem: NSToolbarItem?
     private var sortItem: NSToolbarItem?
+    private var inspectorItem: NSToolbarItem?
+    private var inspectorBeforeCatalog: Bool?
 
     init(window: NSWindow, store: ColorStore, captureManager: RegionCapture, pick: @escaping () -> Void,
          capture: @escaping () -> Void, compact: @escaping () -> Void) {
@@ -68,12 +70,23 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
     }
 
     func focusSearch() {
-        if store.filter == .capture { store.filter = .all }
+        if store.filter == .capture { store.filter = .captures }
         searchItem.beginSearchInteraction()
         searchItem.searchField.selectText(nil)
     }
 
     private func refreshChrome() {
+        if store.filter == .captures {
+            if inspectorBeforeCatalog == nil { inspectorBeforeCatalog = inspector.isCollapsed }
+            inspector.isCollapsed = true
+        } else if let previous = inspectorBeforeCatalog {
+            inspector.isCollapsed = previous
+            inspectorBeforeCatalog = nil
+        }
+        inspectorItem?.isEnabled = store.filter != .captures
+        let searchingCaptures = store.filter == .captures || store.filter == .capture
+        searchItem.searchField.placeholderString = searchingCaptures ? "Search captures" : "Search colors"
+        searchItem.searchField.setAccessibilityLabel(searchingCaptures ? "Search captures" : "Search colors")
         if window?.contentViewController === split {
             window?.title = store.filter == .all ? "All Colors" : store.filterTitle
         }
@@ -85,7 +98,7 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
 
     func controlTextDidChange(_ obj: Notification) {
         guard let field = obj.object as? NSSearchField else { return }
-        if store.filter == .capture { store.filter = .all }
+        if store.filter == .capture { store.filter = .captures }
         store.search = field.stringValue
     }
 
@@ -120,7 +133,10 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
             captureItem = item
             return item
         case .colorInspector:
-            return button(id, "Toggle Inspector", symbol: "sidebar.right", action: #selector(toggleInspector))
+            let item = button(id, "Toggle Inspector", symbol: "sidebar.right", action: #selector(toggleInspector))
+            item.isEnabled = store.filter != .captures
+            inspectorItem = item
+            return item
         case .colorSort:
             let item = NSMenuToolbarItem(itemIdentifier: id)
             item.label = "Sort Colors"
@@ -159,7 +175,10 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
-        for item in menu.items { item.state = item.representedObject as? String == store.sort.rawValue ? .on : .off }
+        for item in menu.items {
+            item.state = item.representedObject as? String == store.sort.rawValue ? .on : .off
+            item.isEnabled = store.filter != .captures || item.representedObject as? String != LibrarySort.hue.rawValue
+        }
     }
     @objc private func changeSort(_ sender: NSMenuItem) {
         if let raw = sender.representedObject as? String, let sort = LibrarySort(rawValue: raw) { store.sort = sort }

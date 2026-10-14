@@ -9,6 +9,7 @@ public struct ColorSource: Codable, Equatable, Sendable {
     public var y: Double?
     public var method: String
     public var capture: CaptureSource?
+    public var websiteURL: String?
 
     public init(appName: String? = nil, bundleIdentifier: String? = nil, windowTitle: String? = nil,
                 displayName: String? = nil, x: Double? = nil, y: Double? = nil, method: String = "Screen pick") {
@@ -58,7 +59,7 @@ public struct SavedColor: Codable, Equatable, Identifiable, Sendable {
     public init(id: UUID = UUID(), name: String, value: ColorValue, createdAt: Date = Date(),
                 collectionID: UUID? = nil, source: ColorSource = ColorSource()) {
         self.id = id; self.name = name; self.value = value; self.createdAt = createdAt; self.updatedAt = createdAt
-        self.collectionID = collectionID; self.favorite = false; self.notes = ""; self.sourceURL = ""; self.source = source
+        self.collectionID = collectionID; self.favorite = false; self.notes = ""; self.sourceURL = source.websiteURL ?? ""; self.source = source
     }
 }
 
@@ -69,19 +70,32 @@ public struct ColorCollection: Codable, Equatable, Identifiable, Sendable {
 }
 
 public struct ColorLibrary: Codable, Equatable, Sendable {
-    public var version: Int = 1
+    public var version: Int = 2
     public var colors: [SavedColor] = []
     public var collections: [ColorCollection] = []
+    public var captures: [SavedCapture] = []
     public init() {}
 
+    private enum CodingKeys: String, CodingKey { case version, colors, collections, captures }
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let storedVersion = try values.decode(Int.self, forKey: .version)
+        guard (1...2).contains(storedVersion) else { throw LibraryError.unsupportedVersion(storedVersion) }
+        version = 2
+        colors = try values.decode([SavedColor].self, forKey: .colors)
+        collections = try values.decode([ColorCollection].self, forKey: .collections)
+        captures = try values.decodeIfPresent([SavedCapture].self, forKey: .captures) ?? []
+    }
+
     public func validate() throws {
-        guard version == 1 else { throw LibraryError.unsupportedVersion(version) }
+        guard version == 2 else { throw LibraryError.unsupportedVersion(version) }
         guard colors.allSatisfy({ color in
             color.value.isValid && (color.source.capture?.isValid ?? true)
                 && [color.source.x, color.source.y].compactMap { $0 }.allSatisfy { $0.isFinite && abs($0) <= 10_000_000 }
         }), Set(colors.map(\.id)).count == colors.count,
               Set(collections.map(\.id)).count == collections.count,
-              colors.allSatisfy({ color in color.collectionID == nil || collections.contains(where: { $0.id == color.collectionID }) })
+              colors.allSatisfy({ color in color.collectionID == nil || collections.contains(where: { $0.id == color.collectionID }) }),
+              captures.allSatisfy(\.isValid), Set(captures.map(\.id)).count == captures.count
         else { throw LibraryError.invalidData }
     }
 }

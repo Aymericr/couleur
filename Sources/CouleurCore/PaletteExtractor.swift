@@ -1,13 +1,13 @@
 import Foundation
 
-public struct PaletteColor: Equatable, Identifiable, Sendable {
+public struct PaletteColor: Codable, Equatable, Identifiable, Sendable {
     public var value: ColorValue
     /// Fraction of sampled, visible pixels assigned to this color group.
     public var proportion: Double
     public var id: String { value.hex }
 }
 
-public struct ExtractedPalette: Equatable, Sendable {
+public struct ExtractedPalette: Codable, Equatable, Sendable {
     public var dominant: [PaletteColor]
     public var shades: [PaletteColor]
     public var analysis = PaletteAnalysis()

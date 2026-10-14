@@ -30,6 +30,40 @@ struct QuietButtonStyle: ButtonStyle {
     }
 }
 
+/// A stationary, neutral close affordance; the swatch keeps its own copy target.
+struct RemoveButton: View {
+    let label: String
+    var revealed = true
+    var compact = false
+    var badge = false
+    let action: () -> Void
+    @FocusState private var focused: Bool
+    @State private var hovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Button(role: .destructive, action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: compact ? 7 : 9, weight: .medium))
+                .foregroundStyle(hovered ? .primary : .secondary)
+                .frame(width: compact ? 16 : 24, height: compact ? 16 : 24)
+                .background {
+                    if badge {
+                        Circle().fill(Color(nsColor: .windowBackgroundColor))
+                            .overlay(Circle().strokeBorder(.primary.opacity(0.12), lineWidth: 0.5))
+                    } else {
+                        Circle().fill(.primary.opacity(hovered ? 0.06 : 0))
+                    }
+                }
+        }.buttonStyle(QuietButtonStyle()).focused($focused)
+            .opacity(revealed || focused ? 1 : 0)
+            .allowsHitTesting(revealed || focused)
+            .onHover { hovered = $0 }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: revealed || focused)
+            .accessibilityLabel(label).help("\(label) · ⌘Z to undo")
+    }
+}
+
 /// A thin rim keeps very light and very dark swatches legible in either appearance.
 struct SwatchRim: ViewModifier {
     let radius: CGFloat

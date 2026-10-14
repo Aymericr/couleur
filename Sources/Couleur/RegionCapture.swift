@@ -3,13 +3,24 @@ import Combine
 import CouleurCore
 
 struct ScreenPalette {
-    let id = UUID()
-    let createdAt = Date()
+    var record: SavedCapture
     let image: PaletteImage
-    let colors: ExtractedPalette
+    var id: UUID { record.id }
+    var createdAt: Date { record.createdAt }
+    var colors: ExtractedPalette { record.palette }
+
+    init(image: PaletteImage, colors: ExtractedPalette, source: ColorSource = ColorSource(method: "Screen capture")) {
+        let name = source.windowTitle.flatMap { $0.isEmpty ? nil : $0 }
+            ?? source.websiteURL.flatMap(SavedCapture.webURL)?.host()
+            ?? "Capture · \(Date().formatted(.dateTime.month(.abbreviated).day().hour().minute()))"
+        record = SavedCapture(name: name, width: image.width, height: image.height, source: source, palette: colors)
+        self.image = image
+    }
+
+    init(record: SavedCapture, image: PaletteImage) { self.record = record; self.image = image }
 
     func source(proportion: Double? = nil, x: Int? = nil, y: Int? = nil, role: PaletteRole? = nil) -> ColorSource {
-        var source = ColorSource(method: "Screen capture")
+        var source = record.source
         source.capture = CaptureSource(id: id, width: image.width, height: image.height,
                                        pixelX: x, pixelY: y, proportion: proportion, suggestedRole: role)
         return source
@@ -59,11 +70,14 @@ final class RegionCapture: ObservableObject {
         guard accessGranted else { showHelp(); return }
         captureFailure = nil
         store.isSampling = true
+        let selection = CaptureSelection()
+        selection.begin()
         beforeCapture?()
         task = Task { [weak self] in
             guard let self else { return }
             var presented = false
             defer {
+                selection.stop()
                 self.process = nil
                 self.store.isSampling = false
                 self.store.isExtracting = false
@@ -78,6 +92,7 @@ final class RegionCapture: ObservableObject {
                 // Allow the app's window to leave the compositor before selection starts.
                 try await Task.sleep(for: .milliseconds(100))
                 let result = try await runCapture(to: url)
+                selection.stop()
                 try Task.checkCancellation()
                 guard FileManager.default.fileExists(atPath: url.path) else {
                     // The native selector exits with status 1 on Escape. No history or
@@ -88,6 +103,7 @@ final class RegionCapture: ObservableObject {
                     return
                 }
                 let data = try Data(contentsOf: url)
+                let windows = ScreenSource.windows()
                 self.store.isExtracting = true
                 self.store.filter = .capture
                 self.store.search = ""
@@ -101,8 +117,19 @@ final class RegionCapture: ObservableObject {
                     try await worker.value
                 } onCancel: { worker.cancel() }
                 try Task.checkCancellation()
-                self.store.screenPalette = ScreenPalette(image: image, colors: colors)
-                self.store.selectedID = nil
+                let rect = selection.region(imageURL: url, image: image)
+                let sourceWindow = rect.flatMap { ScreenSource.window(for: $0, in: windows) }
+                let source = rect.map { ScreenSource.source(at: CGPoint(x: $0.midX, y: $0.midY), window: sourceWindow, method: "Screen capture") }
+                    ?? ColorSource(method: "Screen capture")
+                let capture = ScreenPalette(image: image, colors: colors, source: source)
+                guard self.store.saveCapture(capture, imageData: data) else { self.store.filter = .captures; return }
+                if self.store.rememberWebsites, let sourceWindow {
+                    Task { [weak store = self.store] in
+                        if let website = await BrowserSource.website(for: sourceWindow), store?.rememberWebsites == true {
+                            store?.rememberWebsite(website, forCapture: capture.id)
+                        }
+                    }
+                }
             } catch is CancellationError {
                 // Quitting or canceling leaves the previous capture and library intact.
             } catch {

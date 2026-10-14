@@ -53,6 +53,7 @@ final class PaletteWindowController: NSWindowController, NSWindowDelegate {
         panel.animationBehavior = .none
         panel.isMovable = true
         panel.isMovableByWindowBackground = true
+        panel.acceptsMouseMovedEvents = true
         panel.tabbingMode = .disallowed
         library = LibraryController(window: panel, store: store,
             captureManager: capture,
@@ -264,6 +265,7 @@ final class PaletteWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func windowDidMove(_ notification: Notification) { saveGeometry() }
+    func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? { store.undoManager }
     func windowDidResize(_ notification: Notification) { saveGeometry() }
     private func saveGeometry() {
         guard !transitioning else { return }

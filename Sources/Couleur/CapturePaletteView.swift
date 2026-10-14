@@ -30,17 +30,24 @@ struct CapturePaletteView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Screen palette").font(.system(size: 20, weight: .semibold)).tracking(-0.4)
+                HStack(spacing: 8) {
+                    Button(action: store.showCaptures) {
+                        Image(systemName: "chevron.left").font(.system(size: 12, weight: .medium)).frame(width: 24, height: 24)
+                    }.buttonStyle(QuietButtonStyle()).foregroundStyle(.secondary).help("All captures").accessibilityLabel("Back to captures")
+                    TextField("Name this capture", text: Binding(get: { capture.record.name }, set: { name in store.updateCapture(capture.id) { $0.name = name } }))
+                        .font(.system(size: 17, weight: .semibold)).tracking(-0.3).textFieldStyle(.plain)
+                        .accessibilityLabel("Capture name").disabled(store.readOnly)
                     Spacer(minLength: 8)
                     Menu {
                         Button("Suggested roles…") { beginSave(.roles) }.disabled(capture.colors.analysis.roles.isEmpty)
                         Button("Dominant colors…") { beginSave(.dominant) }
                         Button("All \(capture.colors.shades.count) shades…") { beginSave(.shades) }
-                    } label: { Label("Save palette", systemImage: "folder.badge.plus") }
-                        .menuStyle(.borderlessButton).fixedSize().font(.system(size: 11))
-                        .disabled(store.readOnly).accessibilityLabel("Save captured palette")
+                    } label: { Image(systemName: "folder.badge.plus").frame(width: 20, height: 24) }
+                        .menuStyle(.borderlessButton).fixedSize().font(.system(size: 12))
+                        .disabled(store.readOnly).help("Save colors to a collection").accessibilityLabel("Save captured colors to a collection")
+                    RemoveButton(label: "Delete capture") { store.deleteCapture(capture.id) }.disabled(store.readOnly)
                 }
+                captureSource
                 VStack(spacing: 9) {
                     CaptureImageView(image: capture.image, selectedPixel: selectedPixel, highlightedRegion: nil,
                                      hover: { hoveredPixel = $0 }) { pixel in
@@ -144,6 +151,30 @@ struct CapturePaletteView: View {
         saveSelection = selection
         paletteName = "Screen palette · \(capture.createdAt.formatted(.dateTime.month(.abbreviated).day()))"
         savePrompt = true
+    }
+
+    private var captureSource: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                SourceIcon(source: capture.record.source, size: 14)
+                Text(capture.record.source.appName ?? "Screen capture")
+                Text("·").foregroundStyle(.tertiary)
+                Text(capture.createdAt.formatted(date: .abbreviated, time: .shortened))
+                Spacer(minLength: 0)
+            }.font(.system(size: 10)).foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Image(systemName: "link").font(.system(size: 10)).foregroundStyle(.tertiary)
+                TextField("Add source website…", text: Binding(get: { capture.record.source.websiteURL ?? "" }, set: { text in
+                    store.updateCapture(capture.id) { $0.source.websiteURL = text.isEmpty ? nil : text }
+                })).textFieldStyle(.plain).font(.system(size: 11)).foregroundStyle(.secondary)
+                    .accessibilityLabel("Capture source website").disabled(store.readOnly)
+                    .help("Remembered from supported browsers with Automation access. You can also paste a website here.")
+                if let url = capture.record.website {
+                    Link(destination: url) { Image(systemName: "arrow.up.right").font(.system(size: 10)) }
+                        .help("Open \(capture.record.websiteName ?? "source website")").accessibilityLabel("Open source website")
+                }
+            }
+        }.padding(.top, -12)
     }
 
     private func gradientView(_ gradient: DetectedGradient) -> some View {

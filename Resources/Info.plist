@@ -8,12 +8,13 @@
     <key>CFBundleExecutable</key><string>Couleur</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>1.0.0</string>
-    <key>CFBundleVersion</key><string>3</string>
+    <key>CFBundleVersion</key><string>4</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleIconName</key><string>AppIcon</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSPrincipalClass</key><string>NSApplication</string>
+    <key>NSAppleEventsUsageDescription</key><string>Couleur remembers the website you pick colors or capture palettes from, so you can return to the original page.</string>
     <key>NSHumanReadableCopyright</key><string>Personal software by Aymeric Rabot.</string>
 </dict>
 </plist>

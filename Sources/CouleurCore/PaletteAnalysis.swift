@@ -7,14 +7,14 @@ public enum PaletteRole: String, Codable, Sendable {
     case shadow = "Shadows", highlight = "Highlights"
 }
 
-public struct RoleColor: Equatable, Identifiable, Sendable {
+public struct RoleColor: Codable, Equatable, Identifiable, Sendable {
     public let role: PaletteRole
     public let color: PaletteColor
     public let reason: String
     public var id: String { "\(role.rawValue)-\(color.id)" }
 }
 
-public struct PaletteAnalysis: Equatable, Sendable {
+public struct PaletteAnalysis: Codable, Equatable, Sendable {
     public var roles: [RoleColor] = []
     public var gradients: [DetectedGradient] = []
 }
