@@ -19,14 +19,24 @@ final class ScreenPicker {
             if !initiatedByPress { try? await Task.sleep(for: .milliseconds(80)) }
             guard let self else { return }
             repeat {
-                guard let color = await self.sampler.sample() else { break }
+                guard let value = await self.sampleValue() else { break }
                 let source = self.sourceAtPointer()
-                if let value = ColorValue(color) { self.store.add(value, source: source) }
+                self.store.add(value, source: source)
                 // Shift is sampled at selection time. Release it for the final pick, or press Esc to finish.
                 guard NSEvent.modifierFlags.contains(.shift) else { break }
             } while true
             self.store.isSampling = false
             self.afterPick?()
+        }
+    }
+
+    private func sampleValue() async -> ColorValue? {
+        // Older AppKit SDKs import sample() as nonisolated. Bridge the callback on our main actor
+        // instead, and send only the sRGB value across the continuation, never an AppKit object.
+        await withCheckedContinuation { continuation in
+            sampler.show { color in
+                continuation.resume(returning: color.flatMap { ColorValue($0) })
+            }
         }
     }
 
