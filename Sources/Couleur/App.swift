@@ -165,12 +165,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.mainMenu = main
         NSApp.windowsMenu = window
 
-        #if DEBUG
-        let development = NSMenu(title: "Development")
-        development.addItem(item("Save Interface Previews", #selector(savePreviews)))
-        let developmentRoot = NSMenuItem(); developmentRoot.submenu = development; main.addItem(developmentRoot)
-        #endif
-
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "eyedropper.halffull", accessibilityDescription: "Couleur")
         let statusMenu = NSMenu()
@@ -182,22 +176,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusMenu.addItem(NSMenuItem(title: "Quit Couleur", action: #selector(NSApplication.terminate(_:)), keyEquivalent: ""))
         statusItem.menu = statusMenu
     }
-
-    #if DEBUG
-    @objc private func savePreviews() {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("couleur-previews", isDirectory: true)
-        do {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            for (name, window) in [("library", libraryWindow!), ("picker", floatingPanel!)] {
-                guard let view = window.contentView else { continue }
-                view.layoutSubtreeIfNeeded()
-                let pdf = view.dataWithPDF(inside: view.bounds)
-                try pdf.write(to: folder.appendingPathComponent("\(name).pdf"))
-            }
-            store.notify("Previews saved in \(folder.path)")
-        } catch { store.error = error.localizedDescription }
-    }
-    #endif
 
     @objc private func showAbout() {
         NSApp.orderFrontStandardAboutPanel(options: [
