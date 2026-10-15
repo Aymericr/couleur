@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 /// The app's opalescent glass material, distilled into its everyday tool.
+@MainActor
 enum PipetteArtwork {
     static let image: NSImage = {
         if let url = Bundle.main.url(forResource: "Pipette", withExtension: "png"),
