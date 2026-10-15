@@ -33,10 +33,10 @@ struct CapturePaletteView: View {
             VStack(alignment: .leading, spacing: 22) {
                 HStack(spacing: 8) {
                     Button(action: store.showCaptures) {
-                        Image(systemName: "chevron.left").font(.system(size: 12, weight: .medium)).frame(width: 24, height: 24)
+                        Image(systemName: "chevron.left").font(.geist(size: 12, weight: .medium)).frame(width: 24, height: 24)
                     }.buttonStyle(QuietButtonStyle()).foregroundStyle(.secondary).help("All captures").accessibilityLabel("Back to captures")
                     TextField("Name this capture", text: Binding(get: { capture.record.name }, set: { name in store.updateCapture(capture.id) { $0.name = name } }))
-                        .font(.system(size: 17, weight: .semibold)).tracking(-0.3).textFieldStyle(.plain)
+                        .font(.geist(size: 17, weight: .semibold)).tracking(-0.3).textFieldStyle(.plain)
                         .accessibilityLabel("Capture name").disabled(store.readOnly)
                     Spacer(minLength: 8)
                     Button { sourcePresented.toggle() } label: {
@@ -49,7 +49,7 @@ struct CapturePaletteView: View {
                 DisclosureGroup(isExpanded: $analysisExpanded) {
                 VStack(alignment: .leading, spacing: 22) {
                 HStack {
-                    Text("Suggestions from the image").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text("Suggestions from the image").font(.geist(size: 11)).foregroundStyle(.secondary)
                     Spacer()
                     Menu("Save colors…") {
                         Button("Suggested roles…") { beginSave(.roles) }.disabled(capture.colors.analysis.roles.isEmpty)
@@ -69,7 +69,7 @@ struct CapturePaletteView: View {
                             }
                         }
                         Text("Inferred from color, contrast, and placement. Names stay editable.")
-                            .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            .font(.geist(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 if !capture.colors.analysis.gradients.isEmpty {
@@ -103,8 +103,8 @@ struct CapturePaletteView: View {
                 Divider()
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("Explore shades").font(.system(size: 12, weight: .semibold))
-                        Text("\(shades.count)").font(.system(size: 11)).foregroundStyle(.tertiary)
+                        Text("Explore shades").font(.geist(size: 12, weight: .semibold))
+                        Text("\(shades.count)").font(.geist(size: 11)).foregroundStyle(.tertiary)
                         Spacer()
                         Picker("Sort captured shades", selection: $sort) {
                             ForEach(PaletteOrder.allCases) { Text($0.rawValue).tag($0) }
@@ -119,13 +119,13 @@ struct CapturePaletteView: View {
                         }
                     }
                     Text("Similar shades are grouped. Pick from the image for an exact color.")
-                        .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        .font(.geist(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 }.padding(.top, 18)
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "circle.hexagongrid").foregroundStyle(.secondary)
-                        Text("Explore more colors").font(.system(size: 12))
+                        Text("Explore more colors").font(.geist(size: 12))
                     }
                 }
             }.padding(22)
@@ -155,16 +155,16 @@ struct CapturePaletteView: View {
                 Text("·").foregroundStyle(.tertiary)
                 Text(capture.createdAt.formatted(date: .abbreviated, time: .shortened))
                 Spacer(minLength: 0)
-            }.font(.system(size: 10)).foregroundStyle(.secondary)
+            }.font(.geist(size: 10)).foregroundStyle(.secondary)
             HStack(spacing: 6) {
-                Image(systemName: "link").font(.system(size: 10)).foregroundStyle(.tertiary)
+                Image(systemName: "link").font(.geist(size: 10)).foregroundStyle(.tertiary)
                 TextField("Add source website…", text: Binding(get: { capture.record.source.websiteURL ?? "" }, set: { text in
                     store.updateCapture(capture.id) { $0.source.websiteURL = text.isEmpty ? nil : text }
-                })).textFieldStyle(.plain).font(.system(size: 11)).foregroundStyle(.secondary)
+                })).textFieldStyle(.plain).font(.geist(size: 11)).foregroundStyle(.secondary)
                     .accessibilityLabel("Capture source website").disabled(store.readOnly)
                     .help("Remembered from supported browsers with Automation access. You can also paste a website here.")
                 if let url = capture.record.website {
-                    Link(destination: url) { Image(systemName: "arrow.up.right").font(.system(size: 10)) }
+                    Link(destination: url) { Image(systemName: "arrow.up.right").font(.geist(size: 10)) }
                         .help("Open \(capture.record.websiteName ?? "source website")").accessibilityLabel("Open source website")
                 }
             }
@@ -175,7 +175,7 @@ struct CapturePaletteView: View {
         VStack(alignment: .leading, spacing: 9) {
             LinearGradient(stops: gradient.stops.map { .init(color: $0.color.color, location: $0.location) },
                            startPoint: .leading, endPoint: .trailing)
-                .frame(height: 42).clipShape(RoundedRectangle(cornerRadius: 6)).modifier(SwatchRim(radius: 6))
+                .frame(height: 42).clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous)).modifier(SwatchRim(radius: 6))
                 .accessibilityLabel("Estimated linear gradient with \(gradient.stops.count) stops")
             HStack {
                 Text("\(gradient.angle.formatted(.number.precision(.fractionLength(0))))° · \(gradient.stops.count) stops")
@@ -184,12 +184,12 @@ struct CapturePaletteView: View {
                 Button("Show region") { shownGradientID = gradient.id }.buttonStyle(.link)
                     .popover(isPresented: Binding(get: { shownGradientID == gradient.id }, set: { if !$0 { shownGradientID = nil } })) {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Gradient region").font(.system(size: 12, weight: .semibold))
+                            Text("Gradient region").font(.geist(size: 12, weight: .semibold))
                             CaptureImageView(image: capture.image, selectedPixel: nil, highlightedRegion: gradient.region, hover: { _ in }) { pixel in
                                 store.keepCapturedColor(pixel.color, x: pixel.x, y: pixel.y)
                             }.frame(width: 340, height: 220)
                             Text("Estimated from this area. Click the image to keep an exact color.")
-                                .font(.system(size: 10)).foregroundStyle(.secondary)
+                                .font(.geist(size: 10)).foregroundStyle(.secondary)
                         }.padding(16)
                     }
                 Button {
@@ -204,7 +204,7 @@ struct CapturePaletteView: View {
                     Label(copiedGradientID == gradient.id ? "Copied" : "Copy CSS", systemImage: copiedGradientID == gradient.id ? "checkmark" : "doc.on.doc")
                         .frame(minWidth: 72)
                 }.buttonStyle(.bordered).controlSize(.small)
-            }.font(.system(size: 10))
+            }.font(.geist(size: 10))
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 86, maximum: 115), spacing: 8)], alignment: .leading, spacing: 8) {
                 ForEach(Array(gradient.stops.enumerated()), id: \.offset) { index, stop in
                     Button {
@@ -214,11 +214,11 @@ struct CapturePaletteView: View {
                         HStack(spacing: 4) {
                             Swatch(value: stop.color).frame(width: 14, height: 14).modifier(SwatchRim(radius: 3))
                                 .overlay {
-                                    Image(systemName: "checkmark").font(.system(size: 8, weight: .semibold))
-                                        .frame(width: 14, height: 14).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 3))
+                                    Image(systemName: "checkmark").font(.geist(size: 8, weight: .semibold))
+                                        .frame(width: 14, height: 14).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
                                         .opacity(stopWasCopied(stop) ? 1 : 0)
                                 }
-                            Text(stop.color.hex).font(.system(size: 9, design: .monospaced))
+                            Text(stop.color.hex).font(.geist(size: 9, design: .monospaced))
                         }
                     }.buttonStyle(QuietButtonStyle()).help("Copy & keep stop \(index + 1) · \(stop.color.hex)")
                         .accessibilityLabel("Gradient stop \(index + 1), \(stop.color.hex)")
@@ -233,9 +233,9 @@ struct CapturePaletteView: View {
     }
     private func sectionTitle(_ title: String, detail: String) -> some View {
         HStack {
-            Text(title).font(.system(size: 12, weight: .semibold))
+            Text(title).font(.geist(size: 12, weight: .semibold))
             Spacer()
-            Text(detail).font(.system(size: 10)).foregroundStyle(.secondary)
+            Text(detail).font(.geist(size: 10)).foregroundStyle(.secondary)
         }
     }
 }
@@ -262,19 +262,19 @@ private struct CaptureSwatch: View {
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 6) {
-                if let title { Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(.primary) }
+                if let title { Text(title).font(.geist(size: 11, weight: .medium)).foregroundStyle(.primary) }
                 Swatch(value: color.value).frame(height: prominent ? 66 : 42).modifier(SwatchRim(radius: 6))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 9).strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2).padding(-3)
+                        RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2).padding(-3)
                     }
                     .overlay(alignment: .bottomTrailing) {
-                        Image(systemName: "checkmark").font(.system(size: 9, weight: .semibold))
+                        Image(systemName: "checkmark").font(.geist(size: 9, weight: .semibold))
                             .foregroundStyle(.primary).frame(width: 21, height: 21)
                             .background(.regularMaterial, in: Circle()).padding(5).opacity(copied ? 1 : 0)
                     }
-                Text(color.value.hex).font(.system(size: 10, design: .monospaced))
+                Text(color.value.hex).font(.geist(size: 10, design: .monospaced))
                     .tracking(-0.3).lineLimit(1).minimumScaleFactor(0.8).foregroundStyle(.primary)
-                if prominent { Text(percentage).font(.system(size: 10)).foregroundStyle(.secondary) }
+                if prominent { Text(percentage).font(.geist(size: 10)).foregroundStyle(.secondary) }
             }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
         }.buttonStyle(QuietButtonStyle())
             .help("Copy & keep \(color.value.hex) · about \(percentage) of the image")

@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     private func finishLaunching() {
+        AppTypography.registerBundledFonts()
         // Use this build's artwork even while macOS retains an older icon cache.
         if let url = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
            let icon = NSImage(contentsOf: url) {

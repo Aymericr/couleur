@@ -38,13 +38,17 @@ struct PaletteCanvas: NSViewRepresentable {
             guard let image else { return }
             let rect = geometry.rect
             NSGraphicsContext.saveGraphicsState()
-            NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8).addClip()
+            let context = NSGraphicsContext.current?.cgContext
+            context?.addPath(RoundedRectangle(cornerRadius: 8, style: .continuous).path(in: rect).cgPath)
+            context?.clip()
             NSImage(cgImage: image.cgImage, size: .zero).draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1,
                                                           respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
             NSGraphicsContext.restoreGraphicsState()
-            NSColor.labelColor.withAlphaComponent(0.10).setStroke()
-            let rim = NSBezierPath(roundedRect: rect.insetBy(dx: 0.25, dy: 0.25), xRadius: 8, yRadius: 8)
-            rim.lineWidth = 0.5; rim.stroke()
+            let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            context?.setStrokeColor((dark ? NSColor.white : .black).withAlphaComponent(0.10).cgColor)
+            context?.setLineWidth(0.5)
+            context?.addPath(RoundedRectangle(cornerRadius: 8, style: .continuous).path(in: rect.insetBy(dx: 0.25, dy: 0.25)).cgPath)
+            context?.strokePath()
             for (index, sample) in samples.enumerated() {
                 let point = geometry.point(x: sample.x, y: sample.y)
                 let selected = selectedID == sample.id
@@ -58,7 +62,7 @@ struct PaletteCanvas: NSViewRepresentable {
                 let inner = NSBezierPath(ovalIn: ring.bounds.insetBy(dx: 2, dy: 2))
                 NSColor(srgbRed: sample.color.red, green: sample.color.green, blue: sample.color.blue, alpha: 1).setFill(); inner.fill()
                 let ink = sample.color.relativeLuminance > 0.4 ? NSColor.black : .white
-                let text = NSAttributedString(string: "\(index + 1)", attributes: [.font: NSFont.systemFont(ofSize: selected ? 10 : 9, weight: .semibold), .foregroundColor: ink])
+                let text = NSAttributedString(string: "\(index + 1)", attributes: [.font: AppTypography.native(size: selected ? 10 : 9, weight: .semibold), .foregroundColor: ink])
                 text.draw(at: CGPoint(x: point.x - text.size().width / 2, y: point.y - text.size().height / 2))
             }
             if let dragID, let sample = samples.first(where: { $0.id == dragID }) { drawLoupe(sample, image: image) }

@@ -8,7 +8,7 @@ For interface and motion work, consult the relevant skills from these sources an
 - [transitions.dev](https://github.com/Jakubantalik/transitions.dev/tree/main/skills): consistent motion values and surface transitions.
 - [Jakub Krehel](https://github.com/jakubkrehel/skills): hierarchy, typography, optical alignment, states, and visual polish.
 
-Use native controls, SF Symbols, system typography, and AppKit window behavior. Translate web-specific recipes into native equivalents; adding a web stack or motion dependency is unnecessary.
+Use native controls, SF Symbols, and AppKit window behavior. Use bundled Geist for interface text, Geist Mono for color codes, and Geist Pixel sparingly for the compact wordmark; system menus and dialogs keep native typography. Translate web-specific recipes into native equivalents; adding a web stack or motion dependency is unnecessary.
 
 Copying is a frequent action: perform it immediately, then confirm it on the affected color with a brief, restrained static cue. Keep layout stable. Use motion for spatial continuity and useful feedback, respect Reduce Motion, and avoid decorative bounce or animation on keyboard navigation.
 

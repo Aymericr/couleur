@@ -35,8 +35,8 @@ private struct ColorLibraryHeader: View {
                 }
             } label: {
                 HStack(spacing: 7) {
-                    Text(store.filterTitle).font(.system(size: 17, weight: .semibold)).tracking(-0.3).foregroundStyle(.primary)
-                    Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+                    Text(store.filterTitle).font(.geist(size: 17, weight: .semibold)).tracking(-0.3).foregroundStyle(.primary)
+                    Image(systemName: "chevron.down").font(.geist(size: 9, weight: .semibold)).foregroundStyle(.secondary)
                 }.padding(.vertical, 4)
             }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 .accessibilityLabel("Show colors").help("All colors, favorites, and your collections")
@@ -81,7 +81,7 @@ struct LibraryView: View {
                 if store.isExtracting {
                     VStack(spacing: 12) {
                         ProgressView().controlSize(.small)
-                        Text("Finding the colors…").font(.system(size: 12)).foregroundStyle(.secondary)
+                        Text("Finding the colors…").font(.geist(size: 12)).foregroundStyle(.secondary)
                     }.frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let capture = store.screenPalette {
                     CapturePaletteView(store: store, capture: capture).id(capture.id)
@@ -98,14 +98,15 @@ struct LibraryView: View {
                 else { Text("\(store.visible.count.formatted()) \(store.visible.count == 1 ? "color" : "colors")") }
                 Spacer()
                 if let message = store.message {
-                    Image(systemName: "checkmark").font(.system(size: 10, weight: .medium))
+                    Image(systemName: "checkmark").font(.geist(size: 10, weight: .medium))
                     Text(message)
                 } else {
                     Text(store.filter == .capture ? "Click a palette color to copy & keep" : store.filter == .captures ? "Images and palettes, together" : "Click a color to copy")
                 }
-            }.font(.system(size: 11)).foregroundStyle(.secondary)
+            }.font(.geist(size: 11)).foregroundStyle(.secondary)
                 .padding(.horizontal, 22).frame(height: 32)
         }
+        .font(.geist(size: 12))
         .background(Color(nsColor: .textBackgroundColor))
         .sheet(isPresented: $capture.helpPresented, onDismiss: capture.helpDidDismiss) {
             CaptureAccessView(capture: capture)
@@ -140,14 +141,14 @@ struct LibraryView: View {
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: store.search.isEmpty ? "eyedropper.halffull" : "magnifyingglass")
-                .font(.system(size: 30, weight: .light)).foregroundStyle(.tertiary).padding(.bottom, 2)
-            Text(emptyTitle).font(.system(size: 16, weight: .semibold))
-            Text(emptyDescription).font(.system(size: 12)).foregroundStyle(.secondary)
+                .font(.geist(size: 30, weight: .light)).foregroundStyle(.tertiary).padding(.bottom, 2)
+            Text(emptyTitle).font(.geist(size: 16, weight: .semibold))
+            Text(emptyDescription).font(.geist(size: 12)).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).lineSpacing(3)
             if store.search.isEmpty && store.filter != .favorites {
                 Button("Pick a Color", action: pick).controlSize(.regular).padding(.top, 4)
                     .disabled(store.readOnly || store.isSampling)
-                Text("⌃⌥C from any app").font(.system(size: 11)).foregroundStyle(.tertiary)
+                Text("⌃⌥C from any app").font(.geist(size: 11)).foregroundStyle(.tertiary)
             }
         }.padding(32).frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -198,20 +199,20 @@ private struct ColorTile: View {
         } label: {
             VStack(alignment: .leading, spacing: 9) {
                 Swatch(value: record.value).aspectRatio(1.35, contentMode: .fit)
-                    .modifier(SwatchRim(radius: 11))
+                    .modifier(SwatchRim(radius: 11, hovered: hovered))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 15).strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2)
+                        RoundedRectangle(cornerRadius: 15, style: .continuous).strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2)
                             .padding(-4)
                     }
                     .overlay(alignment: .topLeading) {
                         if record.favorite {
-                            Image(systemName: "star.fill").font(.system(size: 9, weight: .medium))
+                            Image(systemName: "star.fill").font(.geist(size: 9, weight: .medium))
                                 .frame(width: 22, height: 22).background(.regularMaterial, in: Circle()).padding(7)
                         }
                     }
                     .overlay(alignment: .bottomTrailing) {
                         Label("Copied", systemImage: "checkmark")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.geist(size: 11, weight: .medium))
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10).padding(.vertical, 6)
                             .background(.regularMaterial, in: Capsule())
@@ -224,17 +225,17 @@ private struct ColorTile: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {
                         Text(record.displayName)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.geist(size: 12, weight: .medium))
                             .lineLimit(1).foregroundStyle(selected ? Color.accentColor : .primary)
                         Spacer(minLength: 0)
                     }
                     Text(record.value.hex)
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.geist(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary).lineLimit(1)
                 }.padding(.horizontal, 1)
             }
             .padding(4)
-            .background(.primary.opacity(hovered ? 0.025 : 0), in: RoundedRectangle(cornerRadius: 11))
+            .background(.primary.opacity(hovered ? 0.025 : 0), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
             .contentShape(Rectangle())
         }.buttonStyle(QuietButtonStyle())
             .accessibilityLabel("\(record.displayName), \(record.value.hex)")

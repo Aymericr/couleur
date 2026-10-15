@@ -13,5 +13,6 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$binary_dir/Couleur" "$app/Contents/MacOS/Couleur"
 cp Resources/Info.plist "$app/Contents/Info.plist"
 cp Resources/AppIcon.icns Resources/Assets.car "$app/Contents/Resources/"
+ditto Resources/Fonts "$app/Contents/Resources/Fonts"
 bash scripts/sign.sh "$app" com.aymeric.couleur
 echo "Built $PWD/$app"

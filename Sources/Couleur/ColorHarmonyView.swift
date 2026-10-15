@@ -22,7 +22,7 @@ struct ColorHarmonyView: View {
                             Swatch(value: color).frame(height: 42).modifier(SwatchRim(radius: 7))
                                 .overlay {
                                     if store.library.colors.first(where: { $0.id == store.copiedColorID })?.value == color {
-                                        Image(systemName: "checkmark").font(.system(size: 10, weight: .semibold))
+                                        Image(systemName: "checkmark").font(.geist(size: 10, weight: .semibold))
                                             .foregroundStyle(color.relativeLuminance > 0.4 ? .black : .white)
                                     }
                                 }
@@ -31,7 +31,7 @@ struct ColorHarmonyView: View {
                             .help("\(color.suggestedName) · \(color.hex) · Click to copy & keep")
                     }
                 }
-                Text(harmony.detail).font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(harmony.detail).font(.geist(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Button {
                     guard store.copyValues(colors) else { return }
                     copiedPalette = true; feedbackTask?.cancel()
@@ -39,18 +39,18 @@ struct ColorHarmonyView: View {
                 } label: {
                     Label(copiedPalette ? "Copied palette" : "Copy palette", systemImage: copiedPalette ? "checkmark" : "doc.on.doc")
                 }.controlSize(.small)
-                Text("Text contrast").font(.system(size: 11, weight: .medium)).padding(.top, 3)
+                Text("Text contrast").font(.geist(size: 11, weight: .medium)).padding(.top, 3)
                 HStack(spacing: 8) {
                     contrastPreview(on: ColorValue(red: 1, green: 1, blue: 1), name: "White")
                     contrastPreview(on: ColorValue(red: 0.08, green: 0.08, blue: 0.08), name: "Ink")
                 }
                 Text("WCAG AA: 4.5:1 for normal text, 3:1 for large text. Suggested harmonies use OKLCH; chroma is reduced to fit sRGB.")
-                    .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .font(.geist(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }.padding(.bottom, 4)
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: "circle.lefthalf.filled").foregroundStyle(.secondary)
-                Text("Explore harmonies").font(.system(size: 12, weight: .medium))
+                Text("Explore harmonies").font(.geist(size: 12, weight: .medium))
             }
         }.onDisappear { feedbackTask?.cancel() }
     }
@@ -59,12 +59,12 @@ struct ColorHarmonyView: View {
         let ratio = record.value.contrast(on: background)
         let result = ratio >= 4.5 ? "AA" : ratio >= 3 ? "Large text" : "Low contrast"
         return VStack(alignment: .leading, spacing: 5) {
-            Text("Aa").font(.system(size: 22, weight: .medium)).foregroundStyle(record.value.color)
-                .frame(maxWidth: .infinity).frame(height: 44).background(background.color, in: RoundedRectangle(cornerRadius: 7))
-                .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(.primary.opacity(0.08), lineWidth: 0.5))
+            Text("Aa").font(.geist(size: 22, weight: .medium)).foregroundStyle(record.value.color)
+                .frame(maxWidth: .infinity).frame(height: 44).background(background.color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(.primary.opacity(0.08), lineWidth: 0.5))
             Text("\(name) · \(ratio.formatted(.number.precision(.fractionLength(2)))):1").monospacedDigit()
             Text(result).fontWeight(.medium)
-        }.font(.system(size: 9)).foregroundStyle(.secondary)
+        }.font(.geist(size: 9)).foregroundStyle(.secondary)
             .accessibilityElement(children: .combine)
     }
 }

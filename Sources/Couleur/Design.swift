@@ -9,12 +9,12 @@ struct ControlGlass: ViewModifier {
     @Environment(\.colorSchemeContrast) private var contrast
     @ViewBuilder func body(content: Content) -> some View {
         if reduceTransparency || contrast == .increased {
-            content.background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: radius))
-                .overlay(RoundedRectangle(cornerRadius: radius).strokeBorder(.primary.opacity(0.3), lineWidth: 1))
+            content.background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(.primary.opacity(0.3), lineWidth: 1))
         } else {
             #if compiler(>=6.2)
             if #available(macOS 26.0, *) {
-                content.glassEffect(.regular, in: .rect(cornerRadius: radius))
+                content.glassEffect(.regular, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             } else { fallback(content) }
             #else
             fallback(content)
@@ -22,21 +22,37 @@ struct ControlGlass: ViewModifier {
         }
     }
     private func fallback(_ content: Content) -> some View {
-        content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: radius))
-            .overlay(RoundedRectangle(cornerRadius: radius).strokeBorder(.primary.opacity(0.08), lineWidth: 0.5))
-            .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
+        content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .modifier(ShadowBorder(radius: radius))
     }
 }
 
 struct StudioSurface: ViewModifier {
-    var radius: CGFloat = 16
-    @Environment(\.colorScheme) private var scheme
+    var radius: CGFloat = 28
     func body(content: Content) -> some View {
-        content.background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: radius))
-            .overlay(RoundedRectangle(cornerRadius: radius).strokeBorder(
-                LinearGradient(colors: [.white.opacity(scheme == .dark ? 0.12 : 0.8), .primary.opacity(0.06)],
-                               startPoint: .top, endPoint: .bottom), lineWidth: 0.5).allowsHitTesting(false))
-            .shadow(color: .black.opacity(scheme == .dark ? 0.14 : 0.035), radius: 10, y: 3)
+        content.background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .modifier(ShadowBorder(radius: radius))
+    }
+}
+
+/// Native-point version of the craft skill's shadow-border recipe: edge, contact,
+/// and ambient light. Dark surfaces need a white edge rather than heavier shadows.
+struct ShadowBorder: ViewModifier {
+    let radius: CGFloat
+    var hovered = false
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
+    func body(content: Content) -> some View {
+        content.compositingGroup()
+            .shadow(color: .black.opacity(scheme == .light ? (hovered ? 0.08 : 0.06) : 0), radius: 1, y: 0.5)
+            .shadow(color: .black.opacity(scheme == .light ? (hovered ? 0.06 : 0.04) : 0), radius: 2, y: 1)
+            .overlay {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder((scheme == .dark ? Color.white : .black)
+                        .opacity(contrast == .increased ? 0.45 : scheme == .dark ? (hovered ? 0.13 : 0.08) : (hovered ? 0.08 : 0.06)),
+                                  lineWidth: contrast == .increased ? 1 : 0.5)
+                    .allowsHitTesting(false)
+            }
     }
 }
 
@@ -82,7 +98,7 @@ struct RemoveButton: View {
     var body: some View {
         Button(role: .destructive, action: action) {
             Image(systemName: "xmark")
-                .font(.system(size: compact ? 7 : 9, weight: .medium))
+                .font(.geist(size: compact ? 7 : 9, weight: .medium))
                 .foregroundStyle(hovered ? .primary : .secondary)
                 .frame(width: compact ? 16 : 24, height: compact ? 16 : 24)
                 .background {
@@ -105,14 +121,10 @@ struct RemoveButton: View {
 /// A thin rim keeps very light and very dark swatches legible in either appearance.
 struct SwatchRim: ViewModifier {
     let radius: CGFloat
-    @Environment(\.colorSchemeContrast) private var contrast
+    var hovered = false
     func body(content: Content) -> some View {
         content.clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(.primary.opacity(contrast == .increased ? 0.45 : 0.12), lineWidth: 0.5)
-                    .allowsHitTesting(false)
-            }
+            .modifier(ShadowBorder(radius: radius, hovered: hovered))
     }
 }
 

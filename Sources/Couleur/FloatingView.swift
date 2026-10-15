@@ -39,6 +39,7 @@ struct FloatingView: View {
             }.padding(.horizontal, 16).frame(height: 70)
             history.padding(.horizontal, 16).frame(height: 52)
         }
+        .font(.geist(size: 12))
         .frame(width: Self.size.width, height: Self.size.height)
         .modifier(ControlGlass(radius: 16))
         .overlay {
@@ -49,17 +50,17 @@ struct FloatingView: View {
 
     private var header: some View {
         HStack(spacing: 0) {
-            Text("Couleur").font(.system(size: 11, weight: .medium))
+            Text("Couleur").font(.geistPixel(size: 13))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .overlay(WindowDragRegion())
             Button(action: capture) {
-                Image(systemName: "viewfinder").font(.system(size: 11, weight: .regular))
+                Image(systemName: "viewfinder").font(.geist(size: 11, weight: .regular))
                     .foregroundStyle(.secondary).frame(width: 26, height: 24)
             }.buttonStyle(QuietButtonStyle()).help("Capture a palette · ⌘⇧A").accessibilityLabel("Capture screen palette")
                 .disabled(store.isSampling || store.readOnly)
             Button(action: close) {
-                Image(systemName: "xmark").font(.system(size: 8, weight: .medium))
+                Image(systemName: "xmark").font(.geist(size: 8, weight: .medium))
                     .foregroundStyle(.tertiary).frame(width: 20, height: 24)
             }.buttonStyle(QuietButtonStyle()).help("Hide picker · ⌘W").accessibilityLabel("Hide picker")
         }.padding(.leading, 17).padding(.trailing, 11)
@@ -70,7 +71,7 @@ struct FloatingView: View {
             .modifier(SwatchRim(radius: 11))
             .overlay {
                 Image(systemName: "eyedropper")
-                    .font(.system(size: 18, weight: .light))
+                    .font(.geist(size: 18, weight: .light))
                     .foregroundStyle(wellInk.opacity(hoveringWell ? 0.85 : 0.55))
                     .allowsHitTesting(false)
             }
@@ -90,7 +91,7 @@ struct FloatingView: View {
         VStack(alignment: .leading, spacing: 6) {
             Button { if let current { store.copy(current) } else { pick(false) } } label: {
                 Text(current == nil ? "Pick a color" : compactCode)
-                    .font(.system(size: current == nil ? 17 : (isShortCode ? 19 : 12), weight: .regular,
+                    .font(.geist(size: current == nil ? 17 : (isShortCode ? 19 : 12), weight: .regular,
                                   design: current == nil ? .default : .monospaced))
                     .tracking(isShortCode ? -0.55 : -0.25)
                     .lineLimit(2).minimumScaleFactor(0.85)
@@ -104,7 +105,7 @@ struct FloatingView: View {
             HStack(spacing: 8) {
                 formatMenu
                 Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                    .font(.system(size: 10, weight: .regular)).foregroundStyle(.secondary)
+                    .font(.geist(size: 10, weight: .regular)).foregroundStyle(.secondary)
                     .opacity(copied || hoveringValue ? 1 : 0)
                     .accessibilityHidden(true)
                 Spacer(minLength: 0)
@@ -129,7 +130,7 @@ struct FloatingView: View {
             Button("Open color library", action: showLibrary)
             if store.error != nil { Button("View save issue…", action: showLibrary) }
         } label: { Text(store.copyFormat.compactName) }
-            .font(.system(size: 10)).foregroundStyle(.secondary)
+            .font(.geist(size: 10)).foregroundStyle(.secondary)
             .menuStyle(.borderlessButton).menuIndicator(.visible).controlSize(.mini).fixedSize()
             .help("Copy format & options").accessibilityLabel("Copy format and options")
     }
@@ -138,7 +139,7 @@ struct FloatingView: View {
         HStack(spacing: 7) {
             if store.recent.isEmpty {
                 Text("Drag the color well to pick")
-                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                    .font(.geist(size: 10)).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ForEach(store.recent.prefix(6)) { record in
@@ -148,7 +149,7 @@ struct FloatingView: View {
             }
             Button(action: showLibrary) {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 10, weight: .regular)).foregroundStyle(.secondary)
+                    .font(.geist(size: 10, weight: .regular)).foregroundStyle(.secondary)
                     .frame(width: 24, height: 28)
             }.buttonStyle(QuietButtonStyle()).help("Open color library · ⌘1").accessibilityLabel("Expand library")
         }
@@ -167,9 +168,9 @@ private struct RecentSwatch: View {
             store.copy(record)
         } label: {
             Swatch(value: record.value).frame(width: 20, height: 20)
-                .modifier(SwatchRim(radius: 5))
+                .modifier(SwatchRim(radius: 5, hovered: hovered))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 7)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .strokeBorder(.primary.opacity(selected ? 0.30 : 0), lineWidth: 1).padding(-2.5)
                 }
                 .frame(width: 24, height: 34)

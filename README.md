@@ -8,6 +8,8 @@ A personal replacement for [Couleurs](https://couleursapp.com/), inspired by its
 
 The app opens as a **256 × 158 pt floating palette**: a small color well beside a prominent code, with six recent colors below. The surface follows your Mac’s light or dark appearance. On macOS 26 and later it uses native Liquid Glass, with a material fallback on older systems and solid surfaces for Reduce Transparency or Increase Contrast. Swatch colors stay unfiltered.
 
+The interface uses **Geist**, color codes use **Geist Mono**, and the compact wordmark uses **Geist Pixel**. The fonts are bundled locally under the [SIL Open Font License](Resources/Fonts/OFL.txt); no font installation or download is needed at runtime. Continuous corners, fine neutral edges, and soft contact shadows keep surfaces legible in both appearances.
+
 - **Press the color well, hold, drag anywhere on screen, and release** to save and copy the color.
 - Alternatively, click the eyedropper, then click a color, or press **⌃⌥C** from any app.
 - **Hold Shift when selecting** to keep the sampler open and collect more colors. Release Shift for the final selection, or press **Esc** to finish. Each selected color gets its own history entry; the latest is copied.

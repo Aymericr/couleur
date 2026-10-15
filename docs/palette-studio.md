@@ -6,6 +6,8 @@ The canvas and its palette share selection. Clicking a palette swatch keeps and 
 
 Imported images are oriented before sampling and archived as PNG. Canvas geometry excludes letterboxing and clamps drags to actual pixels. Dragging an existing marker preserves the grab offset. Images and swatches are rendered without material overlays; glass is confined to control surfaces. macOS 26 uses native glass, with material and accessibility fallbacks. Both compact and expanded views follow the app appearance.
 
+Rounded surfaces use continuous corners, with outer radii following the inner radius plus padding. The craft skill's shadow-border recipe is translated into native points: a fine neutral edge with small contact and ambient shadows in light mode, and a subtle white edge in dark mode. Increase Contrast strengthens the edge. Geist, Geist Mono, and Geist Pixel are bundled unchanged from Vercel's release and registered only for the app process. Pixel is limited to the compact wordmark; codes remain legible in Mono.
+
 The expanded window has two destinations: Colors and Captures. Collections and favorites live in the color grid dropdown, details start closed, and image analysis is a disclosure below the editor. The Add menu has only pick, capture, and open-image actions. Color families are searchable metadata based on perceptual chroma, hue, and lightness, rather than another navigation tree. They do not move colors out of named collections. New picks get editable suggested names; previously unnamed colors show derived names without changing their saved metadata. Existing personal names win. The vocabulary and family boundaries are editorial approximations, not formal semantic classifications.
 
 Harmonies use OKLCH hue rotations (analogous ±30°, complementary 180°, triadic 120°/240°) or a tonal lightness ramp. Gamut mapping reduces chroma at fixed lightness and hue; it does not clip channels independently. Neutral colors therefore remain neutral. These are starting points to explore, not guarantees that a palette suits a design.
@@ -19,4 +21,6 @@ References:
 - [Apple: Applying Liquid Glass to custom views](https://developer.apple.com/documentation/SwiftUI/Applying-Liquid-Glass-to-custom-views)
 - [Apple design skill](https://github.com/emilkowalski/skills/blob/main/skills/apple-design/SKILL.md)
 - [UI polish skill](https://github.com/jakubkrehel/skills/blob/main/skills/better-ui/SKILL.md) and [color skill](https://github.com/jakubkrehel/skills/blob/main/skills/better-colors/SKILL.md)
+- [Shadow-border and surface recipes](https://github.com/jakubkrehel/skills/blob/main/skills/better-ui/surfaces.md)
+- [Bundled Geist font source and license](../Resources/Fonts/README.md)
 - [Transitions polish reference](https://github.com/Jakubantalik/transitions.dev/blob/main/skills/transitions-polish/SKILL.md)

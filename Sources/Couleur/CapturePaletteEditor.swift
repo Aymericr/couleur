@@ -55,21 +55,21 @@ struct CapturePaletteEditor: View {
             }
             if loading { ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity) }
             HStack(spacing: 5) {
-                Image(systemName: "cursorarrow.motionlines").font(.system(size: 10))
-                Text("Click to add · Drag to refine").font(.system(size: 10, weight: .medium))
+                Image(systemName: "cursorarrow.motionlines").font(.geist(size: 10))
+                Text("Click to add · Drag to refine").font(.geist(size: 10, weight: .medium))
             }.padding(.horizontal, 12).padding(.vertical, 8)
                 .modifier(ControlGlass(radius: 20)).padding(.bottom, 7).allowsHitTesting(false)
         }
         .background(Color(nsColor: .windowBackgroundColor).opacity(scheme == .dark ? 0.65 : 0.55))
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.primary.opacity(0.06), lineWidth: 0.5).allowsHitTesting(false))
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .modifier(ShadowBorder(radius: 26))
     }
 
     private func palette(compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: compact ? 12 : 16) {
             HStack(spacing: 7) {
-                Text("Your palette").font(.system(size: 13, weight: .semibold))
-                Text("\(samples.count)").font(.system(size: 11)).monospacedDigit().foregroundStyle(.tertiary)
+                Text("Your palette").font(.geist(size: 13, weight: .semibold))
+                Text("\(samples.count)").font(.geist(size: 11)).monospacedDigit().foregroundStyle(.tertiary)
                 Spacer()
                 Button(action: addSample) { Image(systemName: "plus").frame(width: 22, height: 22) }
                     .buttonStyle(QuietButtonStyle()).disabled(samples.count >= 12 || loading || store.readOnly)
@@ -80,10 +80,10 @@ struct CapturePaletteEditor: View {
             }
             if samples.isEmpty {
                 Text(loading ? "Placing color points…" : "Click anywhere in the image to begin.")
-                    .font(.system(size: 12)).foregroundStyle(.secondary).frame(height: compact ? 42 : 130)
+                    .font(.geist(size: 12)).foregroundStyle(.secondary).frame(height: compact ? 42 : 130)
             } else if compact {
                 HStack(spacing: 3) { ForEach(Array(samples.enumerated()), id: \.element.id) { index, sample in sampleButton(sample, index: index, compact: true) } }
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             } else {
                 ScrollView {
                     VStack(spacing: 3) { ForEach(Array(samples.enumerated()), id: \.element.id) { index, sample in sampleButton(sample, index: index, compact: false) } }
@@ -92,10 +92,10 @@ struct CapturePaletteEditor: View {
             HStack(spacing: 6) {
                 if let selected {
                     if compact { Text(selected.color.suggestedName).fontWeight(.medium).foregroundStyle(.primary) }
-                    Text(compact ? selected.color.hex : "\(selected.x), \(selected.y) px").fontDesign(.monospaced)
+                    Text(compact ? selected.color.hex : "\(selected.x), \(selected.y) px").font(.geist(size: 10, design: .monospaced))
                     Spacer(minLength: 2)
                 } else { Text("Exact colors from this image"); Spacer() }
-            }.font(.system(size: 10)).foregroundStyle(.secondary).frame(height: 14)
+            }.font(.geist(size: 10)).foregroundStyle(.secondary).frame(height: 14)
             HStack(spacing: 8) {
                 Button(action: copyPalette) { Label(copied ? "Copied" : "Copy palette", systemImage: copied ? "checkmark" : "doc.on.doc").frame(maxWidth: .infinity) }
                     .controlSize(.small).disabled(samples.isEmpty).help("Copy every color as \(store.copyFormat.rawValue)")
@@ -115,25 +115,25 @@ struct CapturePaletteEditor: View {
         } label: {
             HStack(spacing: 10) {
                 Swatch(value: sample.color).frame(width: compact ? nil : 32, height: compact ? 42 : 32)
-                    .clipShape(RoundedRectangle(cornerRadius: compact ? 0 : 7))
+                    .clipShape(RoundedRectangle(cornerRadius: compact ? 0 : 6, style: .continuous))
                     .overlay {
                         if compact || active {
-                            Text(wasCopied ? "✓" : "\(index + 1)").font(.system(size: 10, weight: .semibold))
+                            Text(wasCopied ? "✓" : "\(index + 1)").font(.geist(size: 10, weight: .semibold))
                                 .foregroundStyle(sample.color.relativeLuminance > 0.4 ? .black : .white)
                         }
                     }
                 if !compact {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(sample.color.suggestedName).font(.system(size: 11, weight: .medium)).lineLimit(1)
-                        Text(wasCopied ? "Copied" : sample.color.hex).font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                        Text(sample.color.suggestedName).font(.geist(size: 11, weight: .medium)).lineLimit(1)
+                        Text(wasCopied ? "Copied" : sample.color.hex).font(.geist(size: 10, design: .monospaced)).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
                     if active { Circle().fill(.primary.opacity(0.4)).frame(width: 4, height: 4) }
                 }
             }.padding(compact ? 0 : 6)
-                .background(.primary.opacity(active && !compact ? 0.045 : 0), in: RoundedRectangle(cornerRadius: 11))
+                .background(.primary.opacity(active && !compact ? 0.045 : 0), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay {
-                    if active && compact { RoundedRectangle(cornerRadius: 3).strokeBorder(.white.opacity(0.9), lineWidth: 2).padding(3) }
+                    if active && compact { RoundedRectangle(cornerRadius: 3, style: .continuous).strokeBorder(.white.opacity(0.9), lineWidth: 2).padding(3) }
                 }
                 .contentShape(Rectangle())
         }.buttonStyle(QuietButtonStyle()).focused($focusedSample, equals: sample.id)

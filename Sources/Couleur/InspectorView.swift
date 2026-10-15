@@ -9,15 +9,15 @@ struct InspectorContainer: View {
                 InspectorView(store: store, record: record).id(record.id)
             } else {
                 VStack(spacing: 10) {
-                    Image(systemName: "slider.horizontal.3").font(.system(size: 24, weight: .light))
-                    Text(store.filter == .capture ? "Choose a color" : "Select a color").font(.system(size: 12))
+                    Image(systemName: "slider.horizontal.3").font(.geist(size: 24, weight: .light))
+                    Text(store.filter == .capture ? "Choose a color" : "Select a color").font(.geist(size: 12))
                     if store.filter == .capture {
                         Text("Click a shade or a point in the image\nto copy it and keep it in your library.")
-                            .font(.system(size: 11)).multilineTextAlignment(.center).lineSpacing(3)
+                            .font(.geist(size: 11)).multilineTextAlignment(.center).lineSpacing(3)
                     }
                 }.foregroundStyle(.tertiary).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        }
+        }.font(.geist(size: 12))
     }
 }
 
@@ -40,7 +40,7 @@ struct InspectorView: View {
                 ColorHarmonyView(store: store, record: record)
                 DisclosureGroup("Source & notes") {
                     VStack(alignment: .leading, spacing: 20) { source; notes }.padding(.top, 12)
-                }.font(.system(size: 12)).foregroundStyle(.secondary)
+                }.font(.geist(size: 12)).foregroundStyle(.secondary)
             }.padding(20)
         }
     }
@@ -48,7 +48,7 @@ struct InspectorView: View {
     private var preview: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Details").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                Text("Details").font(.geist(size: 12, weight: .semibold)).foregroundStyle(.secondary)
                 Spacer()
                 ColorPicker("Adjust color", selection: Binding(get: { record.value.color }, set: { color in
                     if let value = ColorValue(NSColor(color)) { store.update(record.id) { $0.value = value } }
@@ -56,7 +56,7 @@ struct InspectorView: View {
                     .help("Adjust color").disabled(store.readOnly)
                 Button { store.update(record.id) { $0.favorite.toggle() } } label: {
                     Image(systemName: record.favorite ? "star.fill" : "star")
-                        .font(.system(size: 13)).foregroundStyle(record.favorite ? Color.orange : .secondary)
+                        .font(.geist(size: 13)).foregroundStyle(record.favorite ? Color.orange : .secondary)
                         .frame(width: 24, height: 22)
                 }.buttonStyle(QuietButtonStyle()).disabled(store.readOnly)
                     .help(record.favorite ? "Remove favorite" : "Add favorite").accessibilityLabel("Favorite color")
@@ -66,14 +66,14 @@ struct InspectorView: View {
             TextField("Name this color", text: Binding(get: {
                 store.library.colors.first { $0.id == record.id }?.displayName ?? record.displayName
             }, set: { name in store.update(record.id) { $0.name = name } }), axis: .vertical)
-                .font(.system(size: 17, weight: .semibold)).textFieldStyle(.plain).lineLimit(1...3)
+                .font(.geist(size: 17, weight: .semibold)).textFieldStyle(.plain).lineLimit(1...3)
                 .accessibilityLabel("Color name").disabled(store.readOnly)
             HStack(spacing: 6) {
-                Text(record.value.family.rawValue).font(.system(size: 10)).foregroundStyle(.secondary)
+                Text(record.value.family.rawValue).font(.geist(size: 10)).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
                 if !record.name.isEmpty && record.name.uppercased() != record.value.hex && record.name != record.value.suggestedName {
                     Button("Use \(record.value.suggestedName)") { store.update(record.id) { $0.name = record.value.suggestedName } }
-                        .font(.system(size: 10)).buttonStyle(.link).disabled(store.readOnly)
+                        .font(.geist(size: 10)).buttonStyle(.link).disabled(store.readOnly)
                         .help("Use the suggested color name")
                 }
             }
@@ -87,18 +87,16 @@ struct InspectorView: View {
                     ForEach(CopyFormat.allCases) { Text($0.rawValue).tag($0) }
                 }.labelsHidden().controlSize(.small).fixedSize()
                 Spacer()
-                Text("sRGB").font(.system(size: 10)).foregroundStyle(.tertiary)
+                Text("sRGB").font(.geist(size: 10)).foregroundStyle(.tertiary)
             }
             Button { store.copy(record) } label: {
                 HStack(alignment: .top, spacing: 10) {
                     Text(record.value.formatted(store.copyFormat))
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .font(.geist(size: 12, weight: .medium, design: .monospaced))
                         .multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
                     Image(systemName: store.copiedColorID == record.id ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 12)).foregroundStyle(.secondary).frame(width: 14)
-                }.padding(11)
-                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 7))
-                    .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(.primary.opacity(0.07), lineWidth: 0.5))
+                        .font(.geist(size: 12)).foregroundStyle(.secondary).frame(width: 14)
+                }.padding(11).modifier(StudioSurface(radius: 10))
             }.buttonStyle(QuietButtonStyle()).help("Copy \(store.copyFormat.rawValue) · ⌘C")
                 .accessibilityLabel("Copy \(store.copyFormat.rawValue) value")
                 .accessibilityValue(record.value.formatted(store.copyFormat))
@@ -107,7 +105,7 @@ struct InspectorView: View {
 
     private var organization: some View {
         HStack {
-            Text("Collection").font(.system(size: 12)).foregroundStyle(.secondary)
+            Text("Collection").font(.geist(size: 12)).foregroundStyle(.secondary)
             Spacer(minLength: 8)
             Picker("Collection", selection: binding(\.collectionID)) {
                 Text("Unfiled").tag(nil as UUID?)
@@ -122,13 +120,13 @@ struct InspectorView: View {
             HStack(spacing: 9) {
                 SourceIcon(source: record.source, size: 28)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(record.source.appName ?? record.source.method).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                    Text(record.source.appName ?? record.source.method).font(.geist(size: 12, weight: .medium)).lineLimit(1)
                     Text(record.createdAt.formatted(date: .abbreviated, time: .shortened))
-                        .font(.system(size: 10)).foregroundStyle(.secondary)
+                        .font(.geist(size: 10)).foregroundStyle(.secondary)
                 }
             }
             if let title = record.source.windowTitle, !title.isEmpty {
-                Text(title).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(3).textSelection(.enabled)
+                Text(title).font(.geist(size: 11)).foregroundStyle(.secondary).lineLimit(3).textSelection(.enabled)
             }
             if let capture = record.source.capture {
                 VStack(alignment: .leading, spacing: 7) {
@@ -151,7 +149,7 @@ struct InspectorView: View {
                         if let display = record.source.displayName { sourceRow("display", display) }
                         if let x = record.source.x, let y = record.source.y { sourceRow("scope", "\(Int(x)), \(Int(y)) px") }
                     }.padding(.top, 6)
-                }.font(.system(size: 11)).foregroundStyle(.secondary)
+                }.font(.geist(size: 11)).foregroundStyle(.secondary)
             }
         }
     }
@@ -161,28 +159,28 @@ struct InspectorView: View {
             VStack(alignment: .leading, spacing: 7) {
                 sectionLabel("Source link")
                 TextField("Add a URL…", text: binding(\.sourceURL))
-                    .textFieldStyle(.roundedBorder).font(.system(size: 11)).controlSize(.small)
+                    .textFieldStyle(.roundedBorder).font(.geist(size: 11)).controlSize(.small)
                     .accessibilityLabel("Source URL").disabled(store.readOnly)
             }
             VStack(alignment: .leading, spacing: 7) {
                 sectionLabel("Notes")
                 TextField("Add a note…", text: binding(\.notes), axis: .vertical)
-                    .lineLimit(3...8).textFieldStyle(.plain).font(.system(size: 12)).padding(9)
+                    .lineLimit(3...8).textFieldStyle(.plain).font(.geist(size: 12)).padding(9)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.primary.opacity(0.07), lineWidth: 0.5))
+                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(.primary.opacity(0.07), lineWidth: 0.5))
                     .accessibilityLabel("Color notes").disabled(store.readOnly)
             }
         }
     }
 
     private func sectionLabel(_ text: String) -> some View {
-        Text(text).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+        Text(text).font(.geist(size: 11, weight: .medium)).foregroundStyle(.secondary)
     }
     private func sourceRow(_ icon: String, _ text: String) -> some View {
         HStack(alignment: .top, spacing: 7) {
             Image(systemName: icon).frame(width: 13).foregroundStyle(.tertiary)
             Text(text).textSelection(.enabled).lineLimit(3)
-        }.font(.system(size: 10)).foregroundStyle(.secondary)
+        }.font(.geist(size: 10)).foregroundStyle(.secondary)
     }
 }

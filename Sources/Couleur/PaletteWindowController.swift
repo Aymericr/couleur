@@ -286,6 +286,7 @@ private final class MorphSurface: NSView {
         super.init(frame: frame)
         wantsLayer = true
         layer?.cornerRadius = 16
+        layer?.cornerCurve = .continuous
         layer?.masksToBounds = true
         layer?.borderWidth = 0.5
         updateLayer()

@@ -11,11 +11,11 @@ struct CaptureCatalogView: View {
         if store.visibleCaptures.isEmpty {
             VStack(spacing: 12) {
                 Image(systemName: store.search.isEmpty ? "rectangle.stack" : "magnifyingglass")
-                    .font(.system(size: 30, weight: .light)).foregroundStyle(.tertiary)
+                    .font(.geist(size: 30, weight: .light)).foregroundStyle(.tertiary)
                 Text(store.search.isEmpty ? "A place for inspiration" : "No matching captures")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.geist(size: 16, weight: .semibold))
                 Text(store.search.isEmpty ? "Capture a piece of your screen.\nIts image and palette stay together." : "Search by name, app, or website.")
-                    .font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(3)
+                    .font(.geist(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(3)
                 if store.search.isEmpty {
                     HStack {
                         Button("Capture an Area", action: capture).disabled(store.readOnly || store.isSampling)
@@ -39,28 +39,29 @@ private struct CaptureTile: View {
     @ObservedObject var store: ColorStore
     let record: SavedCapture
     @State private var hovered = false
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         Button { store.openCapture(record.id) } label: {
             VStack(alignment: .leading, spacing: 9) {
                 CaptureThumbnail(url: store.captureImageURL(record.id))
                     .aspectRatio(1.5, contentMode: .fit)
-                    .background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.primary.opacity(0.08), lineWidth: 0.5))
+                    .background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder((scheme == .dark ? Color.white : .black).opacity(0.10), lineWidth: 0.5))
                 HStack(spacing: 0) {
                     if let samples = record.samples, !samples.isEmpty {
                         ForEach(samples) { sample in Swatch(value: sample.color) }
                     } else { ForEach(record.palette.dominant) { color in Swatch(value: color.value) } }
-                }.frame(height: 9).clipShape(RoundedRectangle(cornerRadius: 3)).accessibilityHidden(true)
+                }.frame(height: 9).clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous)).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(record.name).font(.system(size: 12, weight: .medium)).lineLimit(1).foregroundStyle(.primary)
+                    Text(record.name).font(.geist(size: 12, weight: .medium)).lineLimit(1).foregroundStyle(.primary)
                     HStack(spacing: 5) {
                         SourceIcon(source: record.source, size: 12)
                         Text(record.websiteName ?? record.source.appName ?? record.createdAt.formatted(date: .abbreviated, time: .omitted))
                             .lineLimit(1)
                         Spacer(minLength: 0)
-                    }.font(.system(size: 10)).foregroundStyle(.secondary)
+                    }.font(.geist(size: 10)).foregroundStyle(.secondary)
                 }.padding(.horizontal, 1)
             }.contentShape(Rectangle())
         }.buttonStyle(QuietButtonStyle())
@@ -90,7 +91,7 @@ private struct CaptureThumbnail: View {
                 Image(nsImage: thumbnail).resizable().scaledToFit()
                     .frame(width: geometry.size.width, height: geometry.size.height)
             } else {
-                Image(systemName: "photo").font(.system(size: 20, weight: .light)).foregroundStyle(.tertiary)
+                Image(systemName: "photo").font(.geist(size: 20, weight: .light)).foregroundStyle(.tertiary)
                     .frame(width: geometry.size.width, height: geometry.size.height)
             }
         }

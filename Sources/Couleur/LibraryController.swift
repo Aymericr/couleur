@@ -44,6 +44,7 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
         destinations.target = self
         destinations.action = #selector(changeDestination)
         destinations.segmentStyle = .rounded
+        destinations.font = AppTypography.native(size: 13, weight: .medium)
         destinations.setAccessibilityLabel("Library")
 
         store.objectWillChange.sink { [weak self] in
@@ -141,6 +142,7 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
             searchItem.label = "Search Colors"
             searchItem.searchField.placeholderString = "Search colors"
             searchItem.searchField.delegate = self
+            searchItem.searchField.font = AppTypography.native(size: 12)
             searchItem.searchField.sendsSearchStringImmediately = true
             searchItem.preferredWidthForSearchField = 180
             searchItem.searchField.setAccessibilityLabel("Search colors")
