@@ -102,11 +102,16 @@ struct FloatingView: View {
             .modifier(SwatchRim(radius: 11))
             .shadow(color: .black.opacity(colorScheme == .dark ? 0.25 : 0.12), radius: 3, y: 2)
             .overlay {
-                Image(systemName: confirmed && confirmation?.origin == .pick ? "checkmark" : "eyedropper")
-                    .font(.system(size: 18, weight: confirmed && confirmation?.origin == .pick ? .medium : .light))
-                    .foregroundStyle(wellInk.opacity(confirmed ? 0.9 : hoveringWell ? 0.85 : 0.55))
-                    .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace.offUp))
-                    .allowsHitTesting(false)
+                ZStack {
+                    PipetteIcon().frame(width: 40, height: 40)
+                        .shadow(color: .black.opacity(0.18), radius: 1, y: 1)
+                        .scaleEffect(hoveringWell && !reduceMotion ? 1.04 : 1)
+                        .opacity(confirmed && confirmation?.origin == .pick ? 0 : 1)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundStyle(wellInk.opacity(0.9))
+                        .opacity(confirmed && confirmation?.origin == .pick ? 1 : 0)
+                }.allowsHitTesting(false)
             }
             .overlay(PickSurface(action: pick, enabled: canCollect))
             .onHover { hoveringWell = $0 }
@@ -208,7 +213,10 @@ private struct CompactAction: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 5) {
-                Image(systemName: symbol).font(.system(size: 15, weight: .regular))
+                Group {
+                    if symbol == "eyedropper" { PipetteIcon().frame(width: 19, height: 19) }
+                    else { Image(systemName: symbol).font(.system(size: 15, weight: .regular)) }
+                }.frame(height: 19)
                 Text(title).font(.geist(size: 10, weight: .medium)).lineLimit(1)
             }
             .frame(maxWidth: .infinity).frame(height: 46)

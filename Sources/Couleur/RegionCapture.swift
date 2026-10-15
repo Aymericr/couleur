@@ -46,29 +46,51 @@ enum CapturePaletteSelection {
 @MainActor
 final class RegionCapture: ObservableObject {
     private let store: ColorStore
+    private let accessCheck: () -> Bool
+    private let accessRequest: () -> Bool
+    private let preferences: UserDefaults
     private var process: Process?
     private var task: Task<Void, Never>?
     var beforeCapture: (() -> Void)?
     var afterCapture: ((_ showPalette: Bool) -> Void)?
     var presentHelp: (() -> Void)?
+    var pickAfterSetup: (() -> Void)?
     @Published var helpPresented = false
-    @Published private(set) var accessGranted = CGPreflightScreenCaptureAccess()
-    @Published private(set) var requestedAccess = UserDefaults.standard.bool(forKey: "screenAccessRequested")
+    @Published private(set) var accessGranted: Bool
+    @Published private(set) var requestedAccess: Bool
     @Published private(set) var captureFailure: String?
     @Published private(set) var relaunchFailure: String?
     @Published private(set) var checkedAfterSettings = false
-    private enum AfterHelp { case capture, relaunch }
+    enum AccessPurpose { case pick, capture }
+    @Published private(set) var accessPurpose: AccessPurpose = .pick
+    private enum AfterHelp { case pick, capture, relaunch }
     private var afterHelp: AfterHelp?
     private var isRelaunching = false
 
     var appName: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Couleur" }
 
-    init(store: ColorStore) { self.store = store }
+    init(store: ColorStore, preferences: UserDefaults = .standard,
+         accessCheck: @escaping () -> Bool = CGPreflightScreenCaptureAccess,
+         accessRequest: @escaping () -> Bool = CGRequestScreenCaptureAccess) {
+        self.store = store
+        self.preferences = preferences
+        self.accessCheck = accessCheck
+        self.accessRequest = accessRequest
+        accessGranted = accessCheck()
+        requestedAccess = preferences.bool(forKey: "screenAccessRequested")
+    }
+
+    func showAccessSetup(for purpose: AccessPurpose = .pick) {
+        accessPurpose = purpose
+        checkAccess()
+        showHelp()
+    }
 
     func capture() {
         guard !store.isSampling, !store.readOnly else { return }
         checkAccess()
-        guard accessGranted else { showHelp(); return }
+        guard accessGranted else { showAccessSetup(for: .capture); return }
+        accessPurpose = .capture
         captureFailure = nil
         store.isSampling = true
         let selection = CaptureSelection()
@@ -148,28 +170,29 @@ final class RegionCapture: ObservableObject {
     }
 
     func checkAccess(explicit: Bool = false) {
-        accessGranted = CGPreflightScreenCaptureAccess()
+        accessGranted = accessCheck()
         if explicit { checkedAfterSettings = true }
     }
 
     func requestAccess() {
         requestedAccess = true
-        UserDefaults.standard.set(true, forKey: "screenAccessRequested")
-        _ = CGRequestScreenCaptureAccess()
+        preferences.set(true, forKey: "screenAccessRequested")
+        _ = accessRequest()
         checkAccess()
     }
 
     func openSettings() {
         requestedAccess = true
-        UserDefaults.standard.set(true, forKey: "screenAccessRequested")
+        preferences.set(true, forKey: "screenAccessRequested")
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
             NSWorkspace.shared.open(url)
         }
     }
 
-    func continueCapture() {
+    func continueAfterSetup() {
+        guard accessGranted else { return }
         captureFailure = nil
-        afterHelp = .capture
+        afterHelp = accessPurpose == .capture ? .capture : .pick
         helpPresented = false
     }
 
@@ -177,11 +200,12 @@ final class RegionCapture: ObservableObject {
         let action = afterHelp
         afterHelp = nil
         switch action {
+        case .pick: pickAfterSetup?()
         case .capture: capture()
         case .relaunch:
-            // SwiftUI's sheet must finish closing before AppKit will accept quit.
+            // Dismiss setup before AppKit starts the replacement instance.
             Task {
-                do { try await AppRelaunch.perform() }
+                do { try await AppRelaunch.perform(captureAfterSetup: accessPurpose == .capture) }
                 catch {
                     isRelaunching = false
                     relaunchFailure = "Couldn’t reopen \(appName). \(error.localizedDescription)"

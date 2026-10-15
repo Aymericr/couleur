@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var store: ColorStore!
     private var picker: ScreenPicker!
     private var regionCapture: RegionCapture!
+    private var captureSetup: CaptureSetupController!
     private var palette: PaletteWindowController!
     private var statusItem: NSStatusItem!
     private var hotKey: HotKey?
@@ -60,6 +61,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         picker = ScreenPicker(store: store)
         regionCapture = RegionCapture(store: store)
+        #if DEBUG
+        if isPreview, let state = Bundle.main.object(forInfoDictionaryKey: "CouleurPreviewAccess") as? String,
+           let preferences = UserDefaults(suiteName: "com.aymeric.couleur.preview.access") {
+            preferences.set(state == "restart", forKey: "screenAccessRequested")
+            regionCapture = RegionCapture(store: store, preferences: preferences,
+                                          accessCheck: { state == "ready" }, accessRequest: { false })
+        }
+        #endif
         makeMenus()
         palette = PaletteWindowController(store: store, pick: { [weak self] pressed in
             self?.picker.pick(initiatedByPress: pressed)
@@ -73,9 +82,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             if showPalette { self?.palette.showLibrary() }
         }
         regionCapture.presentHelp = { [weak self] in
-            self?.palette.showLibrary { [weak self] in self?.regionCapture.helpPresented = true }
+            self?.regionCapture.helpPresented = true
         }
+        regionCapture.pickAfterSetup = { [weak self] in self?.palette.pickColor() }
+        captureSetup = CaptureSetupController(capture: regionCapture)
+        captureSetup.beforeShow = { [weak self] in self?.palette.hideForPicking() }
+        captureSetup.afterDismiss = { [weak self] in self?.palette.restoreAfterPick() }
         #if DEBUG
+        if isPreview, Bundle.main.object(forInfoDictionaryKey: "CouleurPreviewAccess") != nil {
+            showFloating()
+            regionCapture.showAccessSetup()
+            return
+        }
         if isPreview, !arguments.contains("--capture-help"),
            let path = Bundle.main.object(forInfoDictionaryKey: "CouleurPreviewImage") as? String {
             store.filter = .capture
@@ -97,9 +115,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         #endif
         if arguments.contains("--capture-help") {
+            showFloating()
             regionCapture.checkAccess(explicit: true)
-            regionCapture.presentHelp?()
+            regionCapture.showAccessSetup(for: arguments.contains("--capture-after-setup") ? .capture : .pick)
         } else if arguments.contains("--library") { showLibrary() } else { showFloating() }
+        if !isPreview, !arguments.contains("--capture-help"), store.library.colors.isEmpty,
+           !regionCapture.accessGranted, !UserDefaults.standard.bool(forKey: "hasSeenScreenAccessSetup") {
+            UserDefaults.standard.set(true, forKey: "hasSeenScreenAccessSetup")
+            regionCapture.showAccessSetup()
+        }
     }
 
     @objc private func findColors() { palette.findColors() }
@@ -115,16 +139,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func exportLibrary() { palette.showLibrary { [weak self] in self?.store.exportLibrary() } }
     @objc private func revealLibrary() { store.revealLibrary() }
     @objc private func showScreenAccess() {
-        regionCapture.checkAccess(explicit: true)
-        regionCapture.presentHelp?()
+        regionCapture.showAccessSetup()
     }
     @objc private func toggleAutoCopy() { store.autoCopy.toggle() }
     @objc private func toggleRememberWebsites() { store.rememberWebsites.toggle() }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         // Dock activation and returning from Settings preserve the current view
-        // and any setup sheet. Never reveal our window inside a screen selection.
-        if let store, !store.isSampling { palette.reveal() }
+        // and the setup window. Never reveal our window inside a screen selection.
+        if let store, !store.isSampling, !regionCapture.helpPresented { palette.reveal() }
         return true
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }

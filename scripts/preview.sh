@@ -32,6 +32,8 @@ info.update(CFBundleIdentifier='com.aymeric.couleur.preview', CFBundleName='Coul
             CFBundleDisplayName='Couleur Preview', CouleurPreviewDirectory=str(folder),
             CouleurPreviewAppearance=sys.argv[1])
 info['CouleurPreviewNativeSampler'] = os.environ.get('COULEUR_PREVIEW_NATIVE_SAMPLER') == '1'
+if os.environ.get('COULEUR_PREVIEW_ACCESS') in ('denied', 'restart', 'ready'):
+    info['CouleurPreviewAccess'] = os.environ['COULEUR_PREVIEW_ACCESS']
 if sys.argv[2]:
     is_loupe = sys.argv[2] == '--loupe'
     image = pathlib.Path(sys.argv[3] if is_loupe else sys.argv[2]).resolve()

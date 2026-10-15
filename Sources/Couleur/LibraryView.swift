@@ -41,9 +41,6 @@ struct LibraryView: View {
         }
         .font(.geist(size: 12))
         .background(Color(nsColor: .textBackgroundColor))
-        .sheet(isPresented: $capture.helpPresented, onDismiss: capture.helpDidDismiss) {
-            CaptureAccessView(capture: capture)
-        }
         .alert("Couleur", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) {
             Button("OK") { store.error = nil }
             if store.readOnly { Button("Reveal library folder") { store.revealLibrary() } }

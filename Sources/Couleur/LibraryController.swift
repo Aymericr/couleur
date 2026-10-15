@@ -157,7 +157,12 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
         let control = NSButton(title: title, target: self, action: action)
         control.bezelStyle = .texturedRounded
         control.font = AppTypography.native(size: 12, weight: .medium)
-        control.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        if symbol == "eyedropper", let artwork = PipetteArtwork.image.copy() as? NSImage {
+            artwork.size = NSSize(width: 19, height: 19)
+            control.image = artwork
+        } else {
+            control.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        }
         control.imagePosition = .imageLeading
         control.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
         control.toolTip = "\(title) · \(shortcut)"

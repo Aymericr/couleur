@@ -87,11 +87,13 @@ final class PaletteWindowController: NSWindowController, NSWindowDelegate {
     func findColors() { showLibrary { [weak self] in self?.library.focusSearch() } }
 
     func pickColor(initiatedByPress: Bool = false) {
+        guard !capture.helpPresented else { return }
         guard !transitioning else { queuedPick = true; return }
         pick(initiatedByPress)
     }
 
     func capturePalette() {
+        guard !capture.helpPresented else { return }
         guard !transitioning else { queuedCapture = true; return }
         capture.capture()
     }

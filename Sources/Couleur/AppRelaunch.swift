@@ -4,10 +4,11 @@ import AppKit
 /// immediately, but it waits for this instance to exit before opening the library.
 @MainActor
 enum AppRelaunch {
-    static func perform() async throws {
+    static func perform(captureAfterSetup: Bool = false) async throws {
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.createsNewApplicationInstance = true
         configuration.arguments = ["--relaunch-after", String(ProcessInfo.processInfo.processIdentifier), "--capture-help"]
+        if captureAfterSetup { configuration.arguments.append("--capture-after-setup") }
         let arguments = ProcessInfo.processInfo.arguments
         if let index = arguments.firstIndex(of: "--data-directory"), arguments.indices.contains(index + 1) {
             configuration.arguments += ["--data-directory", arguments[index + 1]]
