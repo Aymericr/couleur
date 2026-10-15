@@ -9,9 +9,13 @@ jobs:
         run: swift test
       - name: Package app
         run: |
-          ./scripts/build.sh release
+          ./scripts/build.sh release universal
           ditto -c -k --sequesterRsrc --keepParent build/Couleur.app build/Couleur-macOS.zip
       - uses: actions/upload-artifact@v4
         with:
           name: Couleur-macOS
           path: build/Couleur-macOS.zip
+      - name: Validate release tooling
+        run: |
+          bash -n scripts/*.sh
+          python3 -m py_compile scripts/release-metadata.py scripts/check-release-version.py

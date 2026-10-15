@@ -2,7 +2,7 @@
 
 A tiny, floating color picker for macOS. Pick, copy, keep.
 
-A personal replacement for [Couleurs](https://couleursapp.com/), inspired by its compact form factor. Written from scratch in SwiftUI and AppKit, using native screen capture APIs. No dependencies, accounts, servers, or network requests.
+An independent successor to the compact workflow of [Couleurs](https://couleursapp.com/), inspired by its compact form factor. Written from scratch in SwiftUI and AppKit, using native screen capture APIs. No accounts or subscription. Color analysis and your library stay on your Mac. Public builds use Sparkle for signed app updates; no color or capture data is sent.
 
 ## Everyday use
 
@@ -13,7 +13,7 @@ The interface uses **Geist**, color codes use **Geist Mono**, and the compact wo
 - **Press the color well, hold, drag anywhere on screen, and release** to save and copy the color.
 - Alternatively, click **Pick color**, then click a color, or press **⌃⌥C** from any app.
 - **Hold Shift when selecting** to keep the sampler open and collect more colors. Release Shift for the final selection, or press **Esc** to finish. Each selected color gets its own history entry; the latest is copied.
-- **Click the color code** to copy it again. Click a recent swatch to select and copy it.
+- **Click the color code** to copy it again. Click a recent swatch to select and copy it. A checkmark and **Copied** label confirm each action; new picks arrive with a short color transition. Reduce Motion keeps the feedback quiet.
 - Hover a recent swatch or library color for its small **×**. Removal is immediate; **⌘Z** restores it with its name, notes, and source. **⌘⇧Z** redoes the removal.
 - Use the **format menu** beside the code to change its encoding. **Keep on top** is in the same menu.
 - The **expand button in the header** unfolds the same window into the full library. The **Compact Picker** toolbar button (or **⌘2**) folds it back to its original position. Search, selection, and browsing state are preserved. The transition respects **Reduce Motion**.
@@ -94,7 +94,7 @@ Colors are converted to standard **sRGB** before storage. Alpha is preserved; HE
 
 Paste a HEX (3/4/6/8 digits), RGB/RGBA, or HSL/HSLA value through **Paste color from clipboard** or **⌘⇧V**. This is a focused parser for those formats; arbitrary CSS expressions, named colors, and OKLCH input are not supported.
 
-## Install and develop
+## Build from source
 
 Requires **macOS 14 or later**, Xcode command-line tools, and a Swift 6 toolchain. Builds for the current Mac's architecture. No package dependencies.
 
@@ -124,7 +124,7 @@ The debug preview has a separate bundle ID, preferences, and library in `build/p
 
 For permission-free visual checks of the loupe, run `./scripts/preview.sh light --loupe /path/to/image.png`, open the preview, and start picking. This debug-only mode samples the fixture image into the isolated preview library.
 
-The app is signed for local personal use, not notarized for distribution. Rebuilding does not require an Apple Developer account, though a signing certificate keeps privacy grants stable across rebuilds.
+Local builds are signed for development and do not start the public updater. Public distribution uses a universal, Developer ID signed and notarized DMG, signed Sparkle updates, and a generated Homebrew cask. See [release setup and automation](docs/releasing.md). The first public download is not available until that pipeline has completed.
 
 The app icon uses the gradient artwork and single pearl `#` in [`Resources/AppIcon.icon`](Resources/AppIcon.icon). The composition fills the system icon shape with the artwork, preserving its color and dithering without an extra background plate. Its compiled asset catalog and ICNS fallback are checked in, so normal builds need no icon tooling. To regenerate them with Xcode 26 or later:
 
@@ -157,3 +157,7 @@ GitHub Actions runs the core and catalog tests and builds the app on macOS. Host
 ## Acknowledgment
 
 The original [Couleurs by Laurent Baumann](https://couleursapp.com/) inspired the small utility workflow. This is an independent implementation and includes none of its source code or assets. The custom loupe uses [ScreenCaptureKit](https://developer.apple.com/documentation/screencapturekit); [NSColorSampler](https://developer.apple.com/documentation/appkit/nscolorsampler) provides the fallback when screen access is unavailable.
+
+## License and distribution
+
+[MIT](LICENSE). Bundled Geist fonts retain their [SIL Open Font License](Resources/Fonts/OFL.txt); Sparkle retains its own license, included in app builds. The project page is [aymeric.dev/couleur](https://aymeric.dev/couleur). Release packaging, Homebrew, website integration, credential ownership, and update validation are documented in [docs/releasing.md](docs/releasing.md).

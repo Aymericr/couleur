@@ -27,6 +27,48 @@ struct ControlGlass: ViewModifier {
     }
 }
 
+/// One material layer, with reflected light confined to the frame. The swatches
+/// above it remain exact, opaque sRGB; the color only softly lights the shell.
+struct PickerGlass: ViewModifier {
+    let tint: Color
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                if !reduceTransparency && contrast != .increased {
+                    RadialGradient(colors: [tint.opacity(scheme == .dark ? 0.16 : 0.10), .clear],
+                                   center: .topLeading, startRadius: 10, endRadius: 210)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+            }
+            .modifier(ControlGlass(radius: 16))
+            .overlay {
+                if !reduceTransparency && contrast != .increased {
+                    RoundedRectangle(cornerRadius: 15.5, style: .continuous)
+                        .strokeBorder(LinearGradient(colors: [.white.opacity(scheme == .dark ? 0.34 : 0.75),
+                                                             .white.opacity(0.05), .black.opacity(0.14)],
+                                                     startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.75)
+                        .padding(0.5).allowsHitTesting(false)
+                }
+            }
+    }
+}
+
+/// Tiny, reversible press feedback for the compact utility's direct controls.
+struct CompactButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var enabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(enabled && configuration.isPressed && !reduceMotion ? 0.97 : 1)
+            .opacity(!enabled ? 0.4 : configuration.isPressed ? 0.75 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
 struct StudioSurface: ViewModifier {
     var radius: CGFloat = 28
     func body(content: Content) -> some View {

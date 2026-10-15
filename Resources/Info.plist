@@ -8,13 +8,16 @@
     <key>CFBundleExecutable</key><string>Couleur</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>1.0.0</string>
-    <key>CFBundleVersion</key><string>9</string>
+    <key>CFBundleVersion</key><string>10</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleIconName</key><string>AppIcon</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSPrincipalClass</key><string>NSApplication</string>
     <key>NSAppleEventsUsageDescription</key><string>Couleur remembers the website you pick colors or capture palettes from, so you can return to the original page.</string>
-    <key>NSHumanReadableCopyright</key><string>Personal software by Aymeric Rabot.</string>
+    <key>NSHumanReadableCopyright</key><string>Copyright © 2026 Aymeric Rabot. MIT License.</string>
+    <key>SUFeedURL</key><string>https://github.com/Aymericr/couleur/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key><string>Geo/9to9igtzlF/fdaBxl05kBWI13V+N9n7MJpTRYRk=</string>
+    <key>SUSendProfileInfo</key><false/>
 </dict>
 </plist>

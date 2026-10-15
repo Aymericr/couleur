@@ -18,6 +18,7 @@ final class ColorStore: ObservableObject {
     @Published var selectedID: UUID?
     @Published var message: String?
     @Published private(set) var copiedColorID: UUID?
+    @Published private(set) var colorFeedback: ColorFeedback?
     @Published var error: String?
     @Published private(set) var readOnly = false
     @Published var isSampling = false
@@ -35,14 +36,17 @@ final class ColorStore: ObservableObject {
         didSet {
             UserDefaults.standard.set(copyFormat.rawValue, forKey: "copyFormat")
             copiedColorID = nil
+            colorFeedback = nil
         }
     }
     @Published var autoCopy: Bool = UserDefaults.standard.object(forKey: "autoCopy") as? Bool ?? true {
         didSet { UserDefaults.standard.set(autoCopy, forKey: "autoCopy") }
     }
     private let file: LibraryFile
+    private let pasteboard: NSPasteboard
 
-    init(directory: URL? = nil) {
+    init(directory: URL? = nil, pasteboard: NSPasteboard = .general) {
+        self.pasteboard = pasteboard
         let folder = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Couleur", isDirectory: true)
         file = LibraryFile(url: folder.appendingPathComponent("library.json"))
         undoManager.levelsOfUndo = 30
@@ -224,9 +228,12 @@ final class ColorStore: ObservableObject {
         if filter == .favorites || filter == .capture || filter == .captures { filter = .all }
         selectedID = record.id
         if autoCopy {
-            if let performance { performance.measure("CopyPickedColor") { copy(record) } }
-            else { copy(record) }
-        } else { notify("Color saved") }
+            if let performance { performance.measure("CopyPickedColor") { copy(record, origin: .pick) } }
+            else { copy(record, origin: .pick) }
+        } else {
+            notify("Color saved")
+            colorFeedback = ColorFeedback(colorID: record.id, origin: .pick, copied: false)
+        }
         return record.id
     }
 
@@ -287,8 +294,8 @@ final class ColorStore: ObservableObject {
     @discardableResult
     func copyValues(_ colors: [ColorValue]) -> Bool {
         guard !colors.isEmpty else { return false }
-        NSPasteboard.general.clearContents()
-        guard NSPasteboard.general.setString(colors.map { $0.formatted(copyFormat) }.joined(separator: "\n"), forType: .string) else {
+        pasteboard.clearContents()
+        guard pasteboard.setString(colors.map { $0.formatted(copyFormat) }.joined(separator: "\n"), forType: .string) else {
             error = "Could not copy the palette. Please try again."; return false
         }
         notify("Copied \(colors.count) colors")
@@ -308,8 +315,8 @@ final class ColorStore: ObservableObject {
 
     @discardableResult
     func copyGradient(_ gradient: DetectedGradient) -> Bool {
-        NSPasteboard.general.clearContents()
-        guard NSPasteboard.general.setString(gradient.css, forType: .string) else {
+        pasteboard.clearContents()
+        guard pasteboard.setString(gradient.css, forType: .string) else {
             error = "Could not copy the gradient. Please try again."
             return false
         }
@@ -415,21 +422,23 @@ final class ColorStore: ObservableObject {
         if !library.collections.contains(where: { $0.id == id }) { filter = .all }
     }
 
-    func copy(_ record: SavedColor, as format: CopyFormat? = nil) {
+    func copy(_ record: SavedColor, as format: CopyFormat? = nil, origin: ColorFeedback.Origin = .copy) {
         let format = format ?? copyFormat
-        NSPasteboard.general.clearContents()
-        guard NSPasteboard.general.setString(record.value.formatted(format), forType: .string) else {
+        pasteboard.clearContents()
+        guard pasteboard.setString(record.value.formatted(format), forType: .string) else {
             messageTask?.cancel()
             message = nil
             copiedColorID = nil
+            colorFeedback = nil
             error = "Could not copy the color. Please try again."
             return
         }
         notify("Copied \(format.rawValue)", copiedColorID: record.id)
+        colorFeedback = ColorFeedback(colorID: record.id, origin: origin, copied: true)
     }
 
     func paste() {
-        guard let text = NSPasteboard.general.string(forType: .string), let value = ColorValue.parse(text) else {
+        guard let text = pasteboard.string(forType: .string), let value = ColorValue.parse(text) else {
             error = "Paste a HEX, RGB, or HSL color. For example, #E87B65 or rgb(232 123 101)."; return
         }
         add(value, source: ColorSource(method: "Pasted color"))
@@ -440,6 +449,7 @@ final class ColorStore: ObservableObject {
         messageTask?.cancel()
         message = text
         self.copiedColorID = copiedColorID
+        if copiedColorID == nil { colorFeedback = nil }
         messageTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled else { return }

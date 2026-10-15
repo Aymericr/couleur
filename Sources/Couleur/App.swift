@@ -1,5 +1,6 @@
 import AppKit
 import CouleurCore
+import Sparkle
 
 @main
 @MainActor
@@ -21,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var palette: PaletteWindowController!
     private var statusItem: NSStatusItem!
     private var hotKey: HotKey?
+    private var updater: SPUStandardUpdaterController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Task {
@@ -52,6 +54,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         #endif
         store = ColorStore(directory: directory)
+        // Development and isolated previews must never replace themselves with a public build.
+        if !isPreview, Bundle.main.object(forInfoDictionaryKey: "CouleurUpdatesEnabled") as? Bool == true {
+            updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+        }
         picker = ScreenPicker(store: store)
         regionCapture = RegionCapture(store: store)
         makeMenus()
@@ -147,6 +153,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let main = NSMenu()
         let app = NSMenu(title: "Couleur")
         app.addItem(item("About Couleur", #selector(showAbout)))
+        if let updater {
+            let updateItem = NSMenuItem(title: "Check for Updates…", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+            updateItem.target = updater
+            app.addItem(updateItem)
+        }
         app.addItem(.separator())
         app.addItem(item("Copy After Picking", #selector(toggleAutoCopy)))
         app.addItem(item("Remember Source Websites", #selector(toggleRememberWebsites)))
@@ -205,8 +216,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func showAbout() {
         var options: [NSApplication.AboutPanelOptionKey: Any] = [
             .applicationName: "Couleur",
-            .applicationVersion: "1.0",
-            .credits: NSAttributedString(string: "A home for the colors you find.\nBuilt for personal use. Inspired by Couleurs by Laurent Baumann.")
+            .applicationVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
+            .credits: NSAttributedString(string: "A home for the colors you find.\nFree and open source. Made by Aymeric Rabot.\naymeric.dev/couleur\nInspired by Couleurs by Laurent Baumann.")
         ]
         if let icon = NSApp.applicationIconImage { options[.applicationIcon] = icon }
         NSApp.orderFrontStandardAboutPanel(options: options)

@@ -18,10 +18,14 @@ struct FloatingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoveringValue = false
     @State private var hoveringWell = false
+    @State private var displayedValue: ColorValue?
+    @State private var confirmation: ColorFeedback?
+    @State private var handledFeedbackID: UUID?
 
     private var current: SavedColor? { store.selected ?? store.recent.first }
     private var value: ColorValue { current?.value ?? ColorValue(red: 1, green: 1, blue: 1) }
-    private var copied: Bool { current != nil && store.copiedColorID == current?.id }
+    private var visibleFeedback: ColorFeedback? { store.isSampling ? nil : store.colorFeedback }
+    private var confirmed: Bool { confirmation?.colorID == current?.id && confirmation != nil }
     private var compactCode: String {
         switch store.copyFormat {
         case .swiftUI, .nsColor, .uiColor: value.hex
@@ -44,11 +48,34 @@ struct FloatingView: View {
         }
         .font(.geist(size: 12))
         .frame(width: Self.size.width, height: Self.size.height)
-        .modifier(ControlGlass(radius: 16))
+        .modifier(PickerGlass(tint: value.color))
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(.primary.opacity(rimOpacity), lineWidth: 0.5).allowsHitTesting(false)
         }
+        .onAppear {
+            displayedValue = value
+            handledFeedbackID = store.colorFeedback?.id
+        }
+        .onChange(of: value) { _, _ in updateDisplayedColor() }
+        .onChange(of: store.isSampling) { _, sampling in
+            if !sampling { updateDisplayedColor() }
+        }
+        .task(id: visibleFeedback?.id) {
+            guard let event = visibleFeedback, event.id != handledFeedbackID else {
+                if visibleFeedback == nil { confirmation = nil }
+                return
+            }
+            handledFeedbackID = event.id
+            withAnimation(.easeOut(duration: 0.15)) { confirmation = event }
+            do { try await Task.sleep(for: .milliseconds(1500)) } catch { return }
+            withAnimation(.easeOut(duration: 0.15)) { confirmation = nil }
+        }
+    }
+
+    private func updateDisplayedColor() {
+        guard !store.isSampling else { return }
+        withAnimation(.easeOut(duration: reduceMotion ? 0.10 : 0.20)) { displayedValue = value }
     }
 
     private var header: some View {
@@ -69,12 +96,16 @@ struct FloatingView: View {
     }
 
     private var colorWell: some View {
-        Swatch(value: value).frame(width: 64, height: 64)
+        ZStack {
+            Swatch(value: displayedValue ?? value).id((displayedValue ?? value).hex).transition(.opacity)
+        }.frame(width: 64, height: 64)
             .modifier(SwatchRim(radius: 11))
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.25 : 0.12), radius: 3, y: 2)
             .overlay {
-                Image(systemName: "eyedropper")
-                    .font(.geist(size: 18, weight: .light))
-                    .foregroundStyle(wellInk.opacity(hoveringWell ? 0.85 : 0.55))
+                Image(systemName: confirmed && confirmation?.origin == .pick ? "checkmark" : "eyedropper")
+                    .font(.system(size: 18, weight: confirmed && confirmation?.origin == .pick ? .medium : .light))
+                    .foregroundStyle(wellInk.opacity(confirmed ? 0.9 : hoveringWell ? 0.85 : 0.55))
+                    .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace.offUp))
                     .allowsHitTesting(false)
             }
             .overlay(PickSurface(action: pick, enabled: canCollect))
@@ -102,14 +133,20 @@ struct FloatingView: View {
                     .contentShape(Rectangle())
             }.buttonStyle(QuietButtonStyle())
                 .accessibilityLabel(current == nil ? "Pick a color" : "Copy \(store.copyFormat.rawValue) color")
-                .accessibilityValue(copied ? "Copied" : compactCode)
+                .accessibilityValue(confirmed ? (confirmation?.copied == true ? "Copied" : "Picked") : compactCode)
                 .help("Copy \(value.formatted(store.copyFormat))")
             HStack(spacing: 8) {
                 formatMenu
-                Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                    .font(.geist(size: 10, weight: .regular)).foregroundStyle(.secondary)
-                    .opacity(copied || hoveringValue ? 1 : 0)
-                    .accessibilityHidden(true)
+                HStack(spacing: 3) {
+                    Image(systemName: confirmed ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 9, weight: .medium))
+                    Text(confirmed ? (confirmation?.copied == true ? "Copied" : "Picked") : "Copy")
+                        .font(.geist(size: 10, weight: .medium))
+                }
+                .foregroundStyle(confirmed ? .primary : .secondary)
+                .opacity(confirmed || hoveringValue ? 1 : 0)
+                .id(confirmation?.id).transition(.opacity)
+                .accessibilityHidden(true)
                 Spacer(minLength: 0)
             }.frame(height: 16)
         }
@@ -179,7 +216,7 @@ private struct CompactAction: View {
                         in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .modifier(ShadowBorder(radius: 8, hovered: hovered))
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }.buttonStyle(QuietButtonStyle()).onHover { hovered = $0 }
+        }.buttonStyle(CompactButtonStyle()).onHover { hovered = $0 }
             .accessibilityLabel(title).help("\(title) · \(shortcut)")
     }
 }
@@ -189,6 +226,7 @@ private struct RecentSwatch: View {
     let record: SavedColor
     let selected: Bool
     @State private var hovered = false
+    private var copied: Bool { store.copiedColorID == record.id }
 
     var body: some View {
         Button {
@@ -201,10 +239,23 @@ private struct RecentSwatch: View {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .strokeBorder(.primary.opacity(selected ? 0.30 : 0), lineWidth: 1).padding(-2.5)
                 }
+                .overlay {
+                    if copied {
+                        Image(systemName: "checkmark").font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 14, height: 14)
+                            .background(.black.opacity(0.68), in: Circle())
+                            .id(store.colorFeedback?.id).transition(.opacity)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .animation(.easeOut(duration: 0.15), value: store.colorFeedback?.id)
+                .animation(.easeOut(duration: 0.15), value: copied)
                 .frame(width: 24, height: 34)
-        }.buttonStyle(QuietButtonStyle())
+        }.buttonStyle(CompactButtonStyle())
             .help("\(record.displayName) · \(record.value.hex)\n\(ColorProvenance.summary(record))\nClick to copy \(store.copyFormat.rawValue)")
             .accessibilityLabel("Copy recent color \(record.name)")
+            .accessibilityValue(copied ? "Copied" : record.value.hex)
             .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityAction(named: "Delete color") { store.delete(record.id) }
             .overlay(alignment: .topTrailing) {
