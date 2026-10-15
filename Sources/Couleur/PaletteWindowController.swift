@@ -155,7 +155,7 @@ final class PaletteWindowController: NSWindowController, NSWindowDelegate {
         panel.expanded = expanded
         panel.isFloatingPanel = !expanded
         panel.level = expanded ? .normal : (pinned ? .floating : .normal)
-        panel.collectionBehavior = expanded ? [.managed, .fullScreenNone] : [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.collectionBehavior = expanded ? [.managed, .fullScreenNone] : [.canJoinAllSpaces, .fullScreenAuxiliary, .canJoinAllApplications]
         panel.styleMask = expanded ? Self.expandedStyle : Self.compactStyle
         panel.minSize = expanded ? Self.minimumLibrarySize : FloatingView.size
         panel.maxSize = expanded ? NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude) : FloatingView.size

@@ -215,15 +215,18 @@ final class ColorStore: ObservableObject {
     }
 
     @discardableResult
-    func add(_ value: ColorValue, source: ColorSource) -> UUID? {
+    func add(_ value: ColorValue, source: ColorSource, performance: PickPerformance? = nil) -> UUID? {
         let collectionID: UUID? = if case .collection(let id) = filter { id } else { nil }
         let record = SavedColor(name: value.suggestedName, value: value, collectionID: collectionID, source: source)
-        commit { $0.colors.insert(record, at: 0) }
-        guard library.colors.contains(where: { $0.id == record.id }) else { return nil }
+        let save = { self.commit { $0.colors.insert(record, at: 0) } }
+        guard performance?.measure("SavePickedColor", save) ?? save() else { return nil }
         search = ""
         if filter == .favorites || filter == .capture || filter == .captures { filter = .all }
         selectedID = record.id
-        if autoCopy { copy(record) } else { notify("Color saved") }
+        if autoCopy {
+            if let performance { performance.measure("CopyPickedColor") { copy(record) } }
+            else { copy(record) }
+        } else { notify("Color saved") }
         return record.id
     }
 

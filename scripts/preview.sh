@@ -11,7 +11,7 @@ fi
 preview_app="build/Couleur Preview.app"
 ditto build/Couleur.app "$preview_app"
 python3 - "$appearance" "${2:-}" "${3:-}" <<'PY'
-import datetime, json, pathlib, plistlib, sys, uuid
+import datetime, json, os, pathlib, plistlib, sys, uuid
 root = pathlib.Path.cwd()
 folder = root / 'build/preview-data'
 folder.mkdir(parents=True, exist_ok=True)
@@ -31,6 +31,7 @@ info = plistlib.loads(p.read_bytes())
 info.update(CFBundleIdentifier='com.aymeric.couleur.preview', CFBundleName='Couleur Preview',
             CFBundleDisplayName='Couleur Preview', CouleurPreviewDirectory=str(folder),
             CouleurPreviewAppearance=sys.argv[1])
+info['CouleurPreviewNativeSampler'] = os.environ.get('COULEUR_PREVIEW_NATIVE_SAMPLER') == '1'
 if sys.argv[2]:
     is_loupe = sys.argv[2] == '--loupe'
     image = pathlib.Path(sys.argv[3] if is_loupe else sys.argv[2]).resolve()

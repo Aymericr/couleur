@@ -10,6 +10,7 @@ import OSLog
 @MainActor
 final class ScreenLoupe {
     private let log = Logger(subsystem: "com.aymeric.couleur", category: "ScreenLoupe")
+    private let performance: PickPerformance
     private struct Snapshot {
         let screen: NSScreen
         let image: PaletteImage
@@ -23,6 +24,7 @@ final class ScreenLoupe {
     private var lenses: [PixelLoupeView] = []
     private var monitor: Any?
     private var observers: [NSObjectProtocol] = []
+    private var activationObserver: NSObjectProtocol?
     private var completion: CheckedContinuation<Void, Never>?
     private var onPick: ((ColorValue, CGPoint) -> Void)?
     private var point = CGPoint.zero
@@ -31,6 +33,8 @@ final class ScreenLoupe {
     private var finished = false
     private var cursorHidden = false
     var isFinished: Bool { finished }
+
+    init(performance: PickPerformance) { self.performance = performance }
 
     static var previewImageURL: URL? {
         #if DEBUG
@@ -123,6 +127,19 @@ final class ScreenLoupe {
                 MainActor.assumeIsolated { self?.cancel() }
             })
         }
+        // A nonactivating loupe leaves the source app active. In that case our
+        // app cannot resign active again, so also observe deliberate app changes.
+        let originalPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            let activatedPID = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.processIdentifier
+            MainActor.assumeIsolated {
+                guard let activatedPID, activatedPID != originalPID,
+                      activatedPID != ProcessInfo.processInfo.processIdentifier else { return }
+                self?.cancel()
+            }
+        }
     }
 
     private func handle(_ event: NSEvent) -> NSEvent? {
@@ -160,10 +177,11 @@ final class ScreenLoupe {
 
     private func showPanels() {
         for snapshot in snapshots {
-            let panel = LoupePanel(contentRect: snapshot.screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+            let panel = LoupePanel(contentRect: snapshot.screen.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             panel.title = "Pick a color"
             panel.level = .screenSaver
-            panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+            panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .canJoinAllApplications, .stationary, .ignoresCycle]
+            panel.onCancel = { [weak self] in self?.cancel() }
             panel.isOpaque = true
             panel.hasShadow = false
             panel.isReleasedWhenClosed = false
@@ -172,6 +190,7 @@ final class ScreenLoupe {
             panel.animationBehavior = .none
             let surface = FrozenScreenView(image: snapshot.image.cgImage, size: snapshot.screen.frame.size)
             let lens = PixelLoupeView(frame: CGRect(origin: .zero, size: PixelLoupeView.size))
+            lens.onFirstDraw = { [weak self] in self?.performance.loupeDrawn() }
             lens.isHidden = true
             surface.addSubview(lens)
             panel.contentView = surface
@@ -179,8 +198,6 @@ final class ScreenLoupe {
             lenses.append(lens)
             panel.orderFrontRegardless()
         }
-        guard !finished, !panels.isEmpty else { return }
-        NSApp.activate(ignoringOtherApps: true)
         guard !finished, !panels.isEmpty else { return }
         let active = snapshots.firstIndex(where: { $0.grid.pixel(at: point) != nil }) ?? 0
         panels[active].makeKey()
@@ -221,6 +238,10 @@ final class ScreenLoupe {
         if let monitor { NSEvent.removeMonitor(monitor); self.monitor = nil }
         observers.forEach(NotificationCenter.default.removeObserver)
         observers.removeAll()
+        if let activationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(activationObserver)
+            self.activationObserver = nil
+        }
         panels.forEach { $0.orderOut(nil) }
         panels.removeAll()
         lenses.removeAll()
@@ -233,8 +254,10 @@ private enum LoupeFailure: Error { case displayUnavailable }
 
 @MainActor
 private final class LoupePanel: NSPanel {
+    var onCancel: (() -> Void)?
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+    override func cancelOperation(_ sender: Any?) { onCancel?() }
 }
 
 @MainActor
@@ -255,6 +278,7 @@ private final class FrozenScreenView: NSView {
 /// The only visible chrome: a hairline circle, a fine grid, and one outlined pixel.
 @MainActor
 private final class PixelLoupeView: NSView {
+    var onFirstDraw: (() -> Void)?
     static let size = CGSize(width: 181, height: 181)
     private static let cell: CGFloat = 11
     private var crop: CGImage?
@@ -318,6 +342,8 @@ private final class PixelLoupeView: NSView {
         context.setStrokeColor(NSColor.black.cgColor)
         context.setLineWidth(1)
         context.stroke(pixel)
+        onFirstDraw?()
+        onFirstDraw = nil
     }
 
     override func isAccessibilityElement() -> Bool { true }
