@@ -10,6 +10,7 @@ public struct SavedCapture: Codable, Equatable, Identifiable, Sendable {
     public let height: Int
     public var source: ColorSource
     public let palette: ExtractedPalette
+    public var samples: [CaptureSample]?
 
     public init(id: UUID = UUID(), name: String, createdAt: Date = Date(), width: Int, height: Int,
                 source: ColorSource = ColorSource(method: "Screen capture"), palette: ExtractedPalette) {
@@ -31,8 +32,12 @@ public struct SavedCapture: Codable, Equatable, Identifiable, Sendable {
     }
 
     var isValid: Bool {
-        guard (1...100_000).contains(width), (1...100_000).contains(height), width * height <= 100_000_000,
-              (1...64).contains(palette.shades.count), (1...5).contains(palette.dominant.count),
+        guard (1...100_000).contains(width), (1...100_000).contains(height), width * height <= 100_000_000 else { return false }
+        if let samples {
+            guard samples.count <= 12, Set(samples.map(\.id)).count == samples.count,
+                  samples.allSatisfy({ (0..<width).contains($0.x) && (0..<height).contains($0.y) && $0.color.isValid }) else { return false }
+        }
+        guard (1...64).contains(palette.shades.count), (1...5).contains(palette.dominant.count),
               palette.analysis.roles.count <= 64, palette.analysis.gradients.count <= 64,
               [source.x, source.y].compactMap({ $0 }).allSatisfy({ $0.isFinite && abs($0) <= 10_000_000 }) else { return false }
         let colors = palette.shades + palette.dominant + palette.analysis.roles.map(\.color)

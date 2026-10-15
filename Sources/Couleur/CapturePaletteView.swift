@@ -9,11 +9,12 @@ struct CapturePaletteView: View {
     @State private var savePrompt = false
     @State private var saveSelection: CapturePaletteSelection = .roles
     @State private var paletteName = ""
-    @State private var hoveredPixel: ImagePixel?
     @State private var selectedPixel: ImagePixel?
     @State private var shownGradientID: String?
     @State private var copiedGradientID: String?
     @State private var gradientFeedbackTask: Task<Void, Never>?
+    @State private var analysisExpanded = false
+    @State private var sourcePresented = false
 
     private var shades: [PaletteColor] {
         switch sort {
@@ -38,37 +39,23 @@ struct CapturePaletteView: View {
                         .font(.system(size: 17, weight: .semibold)).tracking(-0.3).textFieldStyle(.plain)
                         .accessibilityLabel("Capture name").disabled(store.readOnly)
                     Spacer(minLength: 8)
-                    Menu {
+                    Button { sourcePresented.toggle() } label: {
+                        Image(systemName: "info.circle").frame(width: 24, height: 24)
+                    }.buttonStyle(QuietButtonStyle()).foregroundStyle(.secondary)
+                        .help("Source details").accessibilityLabel("Capture source details")
+                        .popover(isPresented: $sourcePresented) { captureSource.frame(width: 300).padding(20) }
+                }
+                CapturePaletteEditor(store: store, capture: capture) { beginSave(.curated) }
+                DisclosureGroup(isExpanded: $analysisExpanded) {
+                VStack(alignment: .leading, spacing: 22) {
+                HStack {
+                    Text("Suggestions from the image").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Spacer()
+                    Menu("Save colors…") {
                         Button("Suggested roles…") { beginSave(.roles) }.disabled(capture.colors.analysis.roles.isEmpty)
                         Button("Dominant colors…") { beginSave(.dominant) }
                         Button("All \(capture.colors.shades.count) shades…") { beginSave(.shades) }
-                    } label: { Image(systemName: "folder.badge.plus").frame(width: 20, height: 24) }
-                        .menuStyle(.borderlessButton).fixedSize().font(.system(size: 12))
-                        .disabled(store.readOnly).help("Save colors to a collection").accessibilityLabel("Save captured colors to a collection")
-                    RemoveButton(label: "Delete capture") { store.deleteCapture(capture.id) }.disabled(store.readOnly)
-                }
-                captureSource
-                VStack(spacing: 9) {
-                    CaptureImageView(image: capture.image, selectedPixel: selectedPixel, highlightedRegion: nil,
-                                     hover: { hoveredPixel = $0 }) { pixel in
-                        selectedPixel = pixel
-                        store.keepCapturedColor(pixel.color, x: pixel.x, y: pixel.y)
-                    }
-                    .frame(height: 190)
-                    .background(.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 8))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.primary.opacity(0.10), lineWidth: 0.5).allowsHitTesting(false))
-                    HStack(spacing: 5) {
-                        if let pixel = hoveredPixel {
-                            Swatch(value: pixel.color).frame(width: 12, height: 12).modifier(SwatchRim(radius: 3))
-                            Text(pixel.color.hex).fontDesign(.monospaced)
-                            Text("· \(pixel.x), \(pixel.y)").foregroundStyle(.tertiary)
-                        } else {
-                            Text("\(capture.image.width) × \(capture.image.height) px").monospacedDigit()
-                        }
-                        Spacer(minLength: 2)
-                        Text("Click image to pick").foregroundStyle(.tertiary)
-                    }.font(.system(size: 10)).foregroundStyle(.secondary).frame(height: 14)
+                    }.controlSize(.small).fixedSize().disabled(store.readOnly)
                 }
                 if !capture.colors.analysis.roles.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
@@ -134,6 +121,13 @@ struct CapturePaletteView: View {
                     Text("Similar shades are grouped. Pick from the image for an exact color.")
                         .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
+                }.padding(.top, 18)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "circle.hexagongrid").foregroundStyle(.secondary)
+                        Text("Explore more colors").font(.system(size: 12))
+                    }
+                }
             }.padding(22)
         }
         .alert("Save Palette", isPresented: $savePrompt) {
@@ -149,7 +143,7 @@ struct CapturePaletteView: View {
 
     private func beginSave(_ selection: CapturePaletteSelection) {
         saveSelection = selection
-        paletteName = "Screen palette · \(capture.createdAt.formatted(.dateTime.month(.abbreviated).day()))"
+        paletteName = capture.record.name
         savePrompt = true
     }
 
@@ -174,7 +168,7 @@ struct CapturePaletteView: View {
                         .help("Open \(capture.record.websiteName ?? "source website")").accessibilityLabel("Open source website")
                 }
             }
-        }.padding(.top, -12)
+        }
     }
 
     private func gradientView(_ gradient: DetectedGradient) -> some View {

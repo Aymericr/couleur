@@ -28,7 +28,6 @@ struct FloatingView: View {
         }
     }
     private var isShortCode: Bool { compactCode.count <= 10 }
-    private var surface: Color { colorScheme == .dark ? Color(white: 0.115) : Color(white: 0.985) }
     private var rimOpacity: Double { contrast == .increased ? 0.35 : (colorScheme == .dark ? 0.15 : 0.10) }
 
     var body: some View {
@@ -41,7 +40,7 @@ struct FloatingView: View {
             history.padding(.horizontal, 16).frame(height: 52)
         }
         .frame(width: Self.size.width, height: Self.size.height)
-        .background(surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .modifier(ControlGlass(radius: 16))
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(.primary.opacity(rimOpacity), lineWidth: 0.5).allowsHitTesting(false)

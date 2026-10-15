@@ -2,6 +2,44 @@ import AppKit
 import CouleurCore
 import SwiftUI
 
+/// Glass belongs to the control layer. Colors and images remain unfiltered.
+struct ControlGlass: ViewModifier {
+    var radius: CGFloat = 16
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+    @ViewBuilder func body(content: Content) -> some View {
+        if reduceTransparency || contrast == .increased {
+            content.background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: radius))
+                .overlay(RoundedRectangle(cornerRadius: radius).strokeBorder(.primary.opacity(0.3), lineWidth: 1))
+        } else {
+            #if compiler(>=6.2)
+            if #available(macOS 26.0, *) {
+                content.glassEffect(.regular, in: .rect(cornerRadius: radius))
+            } else { fallback(content) }
+            #else
+            fallback(content)
+            #endif
+        }
+    }
+    private func fallback(_ content: Content) -> some View {
+        content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: radius))
+            .overlay(RoundedRectangle(cornerRadius: radius).strokeBorder(.primary.opacity(0.08), lineWidth: 0.5))
+            .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
+    }
+}
+
+struct StudioSurface: ViewModifier {
+    var radius: CGFloat = 16
+    @Environment(\.colorScheme) private var scheme
+    func body(content: Content) -> some View {
+        content.background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: radius))
+            .overlay(RoundedRectangle(cornerRadius: radius).strokeBorder(
+                LinearGradient(colors: [.white.opacity(scheme == .dark ? 0.12 : 0.8), .primary.opacity(0.06)],
+                               startPoint: .top, endPoint: .bottom), lineWidth: 0.5).allowsHitTesting(false))
+            .shadow(color: .black.opacity(scheme == .dark ? 0.14 : 0.035), radius: 10, y: 3)
+    }
+}
+
 /// Swatches show the stored sRGB color without a tint, gradient, or material over it.
 struct Swatch: View {
     let value: ColorValue

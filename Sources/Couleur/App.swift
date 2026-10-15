@@ -104,6 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func copy(_ sender: Any?) { if let record = store.selected { store.copy(record) } }
     @objc func paste(_ sender: Any?) { store.paste() }
     @objc private func importLibrary() { palette.showLibrary { [weak self] in self?.store.importLibrary() } }
+    @objc private func importImage() { palette.showLibrary { [weak self] in self?.store.importImage() } }
     @objc private func exportLibrary() { palette.showLibrary { [weak self] in self?.store.exportLibrary() } }
     @objc private func revealLibrary() { store.revealLibrary() }
     @objc private func showScreenAccess() {
@@ -111,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         regionCapture.presentHelp?()
     }
     @objc private func toggleAutoCopy() { store.autoCopy.toggle() }
+    @objc private func toggleRememberWebsites() { store.rememberWebsites.toggle() }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         // Dock activation and returning from Settings preserve the current view
@@ -122,12 +124,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func applicationWillTerminate(_ notification: Notification) { picker?.cancel(); regionCapture?.cancel() }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(toggleAutoCopy) { menuItem.state = store.autoCopy ? .on : .off }
+        if menuItem.action == #selector(toggleRememberWebsites) { menuItem.state = store.rememberWebsites ? .on : .off }
         // Borderless panels do not advertise AppKit's standard closable style.
         if menuItem.action == #selector(closeWindow(_:)) {
             return (NSApp.keyWindow ?? palette?.window)?.isVisible == true
         }
-        if menuItem.action == #selector(pickColor) || menuItem.action == #selector(capturePalette) {
-            return !store.isSampling && !store.readOnly && !regionCapture.helpPresented
+        if menuItem.action == #selector(pickColor) || menuItem.action == #selector(capturePalette) || menuItem.action == #selector(importImage) {
+            return !store.isSampling && !store.isExtracting && !store.readOnly && !regionCapture.helpPresented
         }
         return true
     }
@@ -143,6 +147,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let app = NSMenu(title: "Couleur")
         app.addItem(item("About Couleur", #selector(showAbout)))
         app.addItem(.separator())
+        app.addItem(item("Copy After Picking", #selector(toggleAutoCopy)))
+        app.addItem(item("Remember Source Websites", #selector(toggleRememberWebsites)))
+        app.addItem(.separator())
         app.addItem(item("Screen Access…", #selector(showScreenAccess)))
         app.addItem(item("Reveal Library Folder", #selector(revealLibrary)))
         app.addItem(.separator())
@@ -154,6 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let file = NSMenu(title: "File")
         file.addItem(item("Pick Color", #selector(pickColor), key: "p", modifiers: [.command, .shift]))
         file.addItem(item("Capture Screen Palette", #selector(capturePalette), key: "a", modifiers: [.command, .shift]))
+        file.addItem(item("Open Image…", #selector(importImage), key: "o"))
         file.addItem(item("Paste Color into Library", #selector(paste(_:)), key: "v", modifiers: [.command, .shift]))
         file.addItem(.separator())
         file.addItem(item("Import Library…", #selector(importLibrary)))

@@ -72,7 +72,7 @@ private func exampleLibrary() -> ColorLibrary {
     json.removeValue(forKey: "captures")
     let data = try JSONSerialization.data(withJSONObject: json)
     let migrated = try LibraryFile.decode(data)
-    #expect(migrated.version == 2)
+    #expect(migrated.version == 3)
     #expect(migrated.colors == original.colors)
     #expect(migrated.collections == original.collections)
     #expect(migrated.captures.isEmpty)

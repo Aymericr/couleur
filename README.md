@@ -6,7 +6,7 @@ A personal replacement for [Couleurs](https://couleursapp.com/), inspired by its
 
 ## Everyday use
 
-The app opens as a **256 × 158 pt floating palette**: a small color well beside a prominent code, with six recent colors below. The surface follows your Mac’s light or dark appearance.
+The app opens as a **256 × 158 pt floating palette**: a small color well beside a prominent code, with six recent colors below. The surface follows your Mac’s light or dark appearance. On macOS 26 and later it uses native Liquid Glass, with a material fallback on older systems and solid surfaces for Reduce Transparency or Increase Contrast. Swatch colors stay unfiltered.
 
 - **Press the color well, hold, drag anywhere on screen, and release** to save and copy the color.
 - Alternatively, click the eyedropper, then click a color, or press **⌃⌥C** from any app.
@@ -14,7 +14,7 @@ The app opens as a **256 × 158 pt floating palette**: a small color well beside
 - **Click the color code** to copy it again. Click a recent swatch to select and copy it.
 - Hover a recent swatch or library color for its small **×**. Removal is immediate; **⌘Z** restores it with its name, notes, and source. **⌘⇧Z** redoes the removal.
 - Use the **format menu** beside the code to change its encoding. **Keep on top** is in the same menu.
-- The **expand button at the bottom right** unfolds the same window into the full library. The **Compact Picker** toolbar button (or **⌘2**) folds it back to its original position. Search, selection, and sidebar state are preserved. The transition respects **Reduce Motion**.
+- The **expand button at the bottom right** unfolds the same window into the full library. The **Compact Picker** toolbar button (or **⌘2**) folds it back to its original position. Search, selection, and browsing state are preserved. The transition respects **Reduce Motion**.
 - The **capture icon in the header** (or **⌘⇧A** while Couleur is active) lets you drag a screen area and explore its palette.
 
 Automatic copying and keeping the picker on top are enabled initially. The floating window can accompany other apps and full-screen Spaces. Drag the quiet header to move it; the small close button hides it.
@@ -24,35 +24,41 @@ Automatic copying and keeping the picker on top are enabled initially. The float
 Every pick is saved immediately and kept across app restarts, with no history limit. Expand to:
 
 - Give colors names, mark favorites, and organize them into named collections.
+- New picks get local, editable name suggestions. Older unnamed colors display a suggested name without rewriting the stored record. Personal names remain unchanged.
+- Switch between **Colors** and **Captures** in the top bar. There is no navigation sidebar. The **All colors** dropdown holds favorites and your collections; search also understands color families such as blues, neutrals, and earth tones.
+- Open the **ⓘ** details panel, then **Explore harmonies**, for analogous, complementary, triadic, and tonal palettes. Click a suggestion to copy and keep it, or copy the whole palette. Text previews measure contrast on white and ink surfaces, including alpha compositing.
 - Search by name, HEX, app, window title, source URL, collection, or notes.
 - Sort by time, name, or hue.
 - Click a library swatch once to select and copy it in your chosen format. A small **Copied** checkmark appears on that swatch for two seconds. Arrow keys browse the selection; **⌘C** copies it.
-- Use **⌘F** for toolbar search. Resize or hide the native sidebar and inspector to make more room for colors.
+- Use **⌘F** for search. Details start closed; **ⓘ** opens names, collections, and optional harmony tools. **Source & notes** reveals metadata only when needed.
 - Adjust a saved color with the native color panel, including opacity.
 - See the pick time, source app and bundle ID, display, and screen coordinates.
 - Add notes and a source URL by hand.
-- Import or export a complete JSON backup through **Library options** or the File menu.
+- Import or export a complete JSON backup through the **File** menu.
 - Browse **Captures** for saved images and their palettes. Rename captures, search by website or app, and return to the original page through its source link.
 
 Screen metadata is best effort: the source app is resolved from the normal window under the pointer, or the window containing the captured rectangle. A selection spanning multiple windows has no single attributed source. Window titles are only saved when macOS supplies them, and can be absent without Screen Recording permission. Clipboard imports are labeled as pasted colors. Screen coordinates use the Core Graphics origin at the top-left of the primary display and may be negative on other displays.
 
-**Remember source websites** is enabled initially and can be changed in either options menu. Couleur reads the current tab in the matching window of Safari or supported Chromium browsers (Chrome, Edge, Brave, Chromium, Vivaldi). macOS may ask for **Automation** access to that browser. It checks both window bounds and title before recording a URL, skips Chromium incognito windows, and only stores HTTP(S) links without embedded credentials. It does not read browsing history or execute page JavaScript. A denied request, unsupported browser, or changed tab leaves the website empty; the source link remains editable. Browser lookup runs off the main thread and never delays saving or copying a color.
+**Remember source websites** is enabled initially and can be changed in the **Couleur** app menu or the compact format/options menu. Couleur reads the current tab in the matching window of Safari or supported Chromium browsers (Chrome, Edge, Brave, Chromium, Vivaldi). macOS may ask for **Automation** access to that browser. It checks both window bounds and title before recording a URL, skips Chromium incognito windows, and only stores HTTP(S) links without embedded credentials. It does not read browsing history or execute page JavaScript. A denied request, unsupported browser, or changed tab leaves the website empty; the source link remains editable. Browser lookup runs off the main thread and never delays saving or copying a color.
 
 Screen picking uses a compact circular loupe with a fine grid and an outlined center pixel. It takes a temporary snapshot of each display so the visible pixel and the saved sRGB value agree. Arrow keys refine the selection one source pixel at a time. The snapshots stay in memory and disappear when picking ends. Canceling with Esc never creates an entry or changes the clipboard; previously collected colors remain saved during a Shift session. Without screen access, the native macOS sampler remains available without requiring Accessibility permission.
 
 ## Screen palettes
 
-Choose **Capture Screen Palette** from the File or menu-bar menu, the compact header, or the library toolbar. Drag a rectangle using macOS's screenshot selector; **Esc** cancels. Couleur hides its window during selection, then expands into the result:
+Choose **Capture Screen Palette** from the File or menu-bar menu, the compact header, or **+ → Capture area** in the library. Drag a rectangle using macOS's screenshot selector; **Esc** cancels. Couleur hides its window during selection, then expands into the result:
 
 - Up to **five dominant colors**, ordered by area, with approximate percentages and a proportion strip.
 - **Suggested color roles**: background, surface, foreground, and accents for flat designs; main colors, accents, shadows, and highlights for textured images. Click a role to copy and save its color with an editable name and role metadata.
 - **Estimated linear gradients**, including multi-stop gradients within a larger image. Inspect the source region, copy CSS, or keep individual stops. Gradients are inferred from spatial changes, not assembled from unrelated swatches.
 - Up to **64 grouped shades**, sortable by area or hue.
-- The captured image, with a live color readout under the pointer. **Click anywhere in the image** to pick the exact full-resolution pixel.
+- A large image canvas with up to **12 movable color points**. Five representative points are suggested initially. **Click to add**, drag a numbered point to refine it, or use **+ / −** beside Your palette. The small pixel loupe appears during dragging. **Esc** cancels an unfinished drag.
+- Arrow keys move a selected point by one original image pixel; **Shift** moves ten. The palette buttons also support keyboard focus and arrow refinement. **⌘Z / ⌘⇧Z** undo and redo palette edits.
+- Your palette saves with the image, including exact pixel coordinates. Moving a point updates the palette on release; it does not fill the color history with intermediate samples. Click a palette swatch to copy and keep that color, **Copy palette** for every color in the selected format, or the folder button to create a collection.
+- Choose **+ → Open image…** (or **File → Open Image…**, **⌘O**) to explore a local photo or design. Image orientation is normalized, and a PNG copy is kept locally.
 - Click a shade to **copy and save it** in the current copy format. A checkmark confirms the copy. Repeated clicks on the same color in that capture reuse its history entry.
-- **Save palette** keeps suggested roles, dominant colors, or all the grouped shades in a named collection. Names and notes on already-picked, unfiled colors are preserved.
+- Expand **Explore more colors** for suggested roles, gradients, dominant colors, and the full shade catalog. **Save colors…** inside that section saves those groups as a collection. Names and notes on already-picked, unfiled colors are preserved.
 - Every successful capture is **saved automatically**, including the original image, all grouped shades, roles, gradients, capture date, and available source metadata. Open it again from **Captures**, including after restarting the app. A capture stays together as one palette; individual colors enter All Colors when you choose to keep them.
-- Use **×** in the capture header or on a gallery thumbnail to remove it. **⌘Z** restores the capture and image during the session; removed images go to the Mac's Trash. Colors already kept in your library are independent and retain their source metadata.
+- Hover a gallery thumbnail for **×**, or use its context menu, to remove a capture. **⌘Z** restores the capture and image during the session; removed images go to the Mac's Trash. Colors already kept in your library are independent and retain their source metadata.
 
 Extraction uses a bounded image sample and population-weighted OKLab clustering. Representatives are colors found in that sample. Group percentages are estimates, not exact pixel counts; very small accents may be absent from the grouped palette. The image picker reads the original pixels independently, so you can still access every color in the captured area. Both paths convert to sRGB.
 
@@ -132,9 +138,11 @@ Your data lives outside the repository and app bundle:
 ~/Library/Application Support/Couleur/captures/<capture-id>.png
 ```
 
-Writes are atomic. Before each successful change, the previous valid catalog is saved as `library.backup.json`. The backup is the previous version, not a full revision archive, and references the images beside it. **Export library** creates a portable JSON archive containing the catalog and every original capture image. Reinstalling the app keeps the library. **Reveal library folder** is available in the app and library menus.
+Writes are atomic. Before each successful change, the previous valid catalog is saved as `library.backup.json`. The backup is the previous version, not a full revision archive, and references the images beside it. **Export library** creates a portable JSON archive containing the catalog and every original capture image. Reinstalling the app keeps the library. **Reveal library folder** is available in the **Couleur** app menu.
 
-A damaged or unsupported file opens in read-only recovery mode and is never silently replaced with an empty library. To recover: quit Couleur, keep a copy of the damaged file and capture images, replace `library.json` with the previous catalog backup, and relaunch. Portable exports are restored through **Import library** and merge by UUID, preserving existing records with the same identity. Version 1 color libraries migrate to version 2 without losing colors or metadata; older app builds refuse to overwrite the newer format. Removing a collection moves its colors to Unfiled. Color and capture deletions support native Undo/Redo until the app quits.
+A damaged or unsupported file opens in read-only recovery mode and is never silently replaced with an empty library. To recover: quit Couleur, keep a copy of the damaged file and capture images, replace `library.json` with the previous catalog backup, and relaunch. Portable exports are restored through **Import library** and merge by UUID, preserving existing records with the same identity. Version 1 and 2 libraries migrate to version 3 without losing colors or metadata; older app builds refuse to overwrite the newer format. Version 3 includes editable image palettes. Removing a collection moves its colors to Unfiled. Color and capture deletions and palette edits support native Undo/Redo until the app quits.
+
+Color names and families are deterministic suggestions from a small curated vocabulary and perceptual color distance, not object recognition or a universal naming standard. Harmonies preserve perceptual lightness and hue relationships, reducing chroma when needed to fit sRGB. See [palette studio implementation notes](docs/palette-studio.md) for behavior and references.
 
 ## Structure
 

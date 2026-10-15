@@ -17,7 +17,10 @@ struct CaptureCatalogView: View {
                 Text(store.search.isEmpty ? "Capture a piece of your screen.\nIts image and palette stay together." : "Search by name, app, or website.")
                     .font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(3)
                 if store.search.isEmpty {
-                    Button("Capture an Area", action: capture).padding(.top, 4).disabled(store.readOnly || store.isSampling)
+                    HStack {
+                        Button("Capture an Area", action: capture).disabled(store.readOnly || store.isSampling)
+                        Button("Open Image…", action: store.importImage).disabled(store.readOnly || store.isExtracting)
+                    }.padding(.top, 4)
                 }
             }.frame(maxWidth: .infinity, maxHeight: .infinity).padding(24)
         } else {
@@ -46,7 +49,9 @@ private struct CaptureTile: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.primary.opacity(0.08), lineWidth: 0.5))
                 HStack(spacing: 0) {
-                    ForEach(record.palette.dominant) { color in Swatch(value: color.value) }
+                    if let samples = record.samples, !samples.isEmpty {
+                        ForEach(samples) { sample in Swatch(value: sample.color) }
+                    } else { ForEach(record.palette.dominant) { color in Swatch(value: color.value) } }
                 }.frame(height: 9).clipShape(RoundedRectangle(cornerRadius: 3)).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(record.name).font(.system(size: 12, weight: .medium)).lineLimit(1).foregroundStyle(.primary)
@@ -55,7 +60,6 @@ private struct CaptureTile: View {
                         Text(record.websiteName ?? record.source.appName ?? record.createdAt.formatted(date: .abbreviated, time: .omitted))
                             .lineLimit(1)
                         Spacer(minLength: 0)
-                        Text("\(record.palette.shades.count) shades").monospacedDigit()
                     }.font(.system(size: 10)).foregroundStyle(.secondary)
                 }.padding(.horizontal, 1)
             }.contentShape(Rectangle())

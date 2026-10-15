@@ -30,12 +30,13 @@ struct ScreenPalette {
 }
 
 enum CapturePaletteSelection {
-    case roles, dominant, shades
+    case roles, dominant, shades, curated
     func colors(in capture: ScreenPalette) -> [PaletteColor] {
         switch self {
         case .roles: capture.colors.analysis.roles.map(\.color)
         case .dominant: capture.colors.dominant
         case .shades: capture.colors.shades
+        case .curated: (capture.record.samples ?? []).map { PaletteColor(value: $0.color, proportion: 0) }
         }
     }
 }

@@ -26,6 +26,7 @@ final class ColorStore: ObservableObject {
     @Published var filter: LibraryFilter = .all
     @Published var search = ""
     @Published var sort: LibrarySort = .newest
+    @Published var detailsVisible = false
     let undoManager = UndoManager()
     @Published var rememberWebsites = UserDefaults.standard.object(forKey: "rememberWebsites") as? Bool ?? true {
         didSet { UserDefaults.standard.set(rememberWebsites, forKey: "rememberWebsites") }
@@ -62,13 +63,13 @@ final class ColorStore: ObservableObject {
             case .unfiled: matches = color.collectionID == nil
             case .collection(let id): matches = color.collectionID == id
             }
-            return matches && (query.isEmpty || [color.name, color.value.hex, color.notes, color.source.appName ?? "", color.source.windowTitle ?? "", color.sourceURL, collectionName(color.collectionID)]
+            return matches && (query.isEmpty || [color.name, color.displayName, color.value.family.rawValue, color.value.hex, color.notes, color.source.appName ?? "", color.source.windowTitle ?? "", color.sourceURL, collectionName(color.collectionID)]
                 .contains { $0.localizedCaseInsensitiveContains(query) })
         }
         return colors.sorted { a, b in
             switch sort {
             case .newest: return a.createdAt > b.createdAt
-            case .name: return a.name.localizedStandardCompare(b.name) == .orderedAscending
+            case .name: return a.displayName.localizedStandardCompare(b.displayName) == .orderedAscending
             case .hue: return a.value.hsl.hue < b.value.hsl.hue
             }
         }
@@ -122,6 +123,67 @@ final class ColorStore: ObservableObject {
 
     func showCaptures() { filter = .captures; selectedID = nil }
 
+    @discardableResult
+    func setCaptureSamples(_ id: UUID, samples: [CaptureSample], undoable: Bool = true) -> Bool {
+        guard let capture = screenPalette, capture.id == id,
+              let previous = library.captures.first(where: { $0.id == id })?.samples else {
+            if !undoable, let index = library.captures.firstIndex(where: { $0.id == id }), library.captures[index].samples == nil {
+                return writeCaptureSamples(id, samples: samples)
+            }
+            return false
+        }
+        guard samples != previous else { return true }
+        guard writeCaptureSamples(id, samples: samples) else { return false }
+        if undoable {
+            undoManager.registerUndo(withTarget: self) { store in
+                MainActor.assumeIsolated {
+                    // Undo can be invoked after navigating away from the capture.
+                    store.openCapture(id)
+                    _ = store.setCaptureSamples(id, samples: previous)
+                }
+            }
+            undoManager.setActionName("Edit Palette")
+        }
+        return true
+    }
+
+    private func writeCaptureSamples(_ id: UUID, samples: [CaptureSample]) -> Bool {
+        guard let capture = screenPalette, capture.id == id, samples.count <= 12,
+              Set(samples.map(\.id)).count == samples.count else { return false }
+        var exact: [CaptureSample] = []
+        for sample in samples {
+            guard let value = capture.image.color(x: sample.x, y: sample.y) else { return false }
+            exact.append(CaptureSample(id: sample.id, x: sample.x, y: sample.y, color: value))
+        }
+        guard commit({ library in
+            guard let index = library.captures.firstIndex(where: { $0.id == id }) else { return }
+            library.captures[index].samples = exact
+        }) else { return false }
+        screenPalette?.record.samples = exact
+        return true
+    }
+
+    func importImage() {
+        guard !readOnly, !isExtracting, !isSampling else { return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]; panel.allowsMultipleSelection = false
+        panel.message = "Explore the colors in an image. A copy stays in your capture library."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        isExtracting = true; filter = .capture; selectedID = nil
+        Task {
+            defer { isExtracting = false }
+            do {
+                let result = try await Task.detached(priority: .userInitiated) {
+                    let image = try PaletteImage(data: Data(contentsOf: url))
+                    return try (image, image.extract(), image.pngData())
+                }.value
+                let source = ColorSource(windowTitle: url.deletingPathExtension().lastPathComponent, method: "Imported image")
+                let capture = ScreenPalette(image: result.0, colors: result.1, source: source)
+                _ = saveCapture(capture, imageData: result.2)
+            } catch { self.error = "Could not open this image: \(error.localizedDescription)" }
+        }
+    }
+
     func updateCapture(_ id: UUID, _ edit: (inout SavedCapture) -> Void) {
         guard library.captures.contains(where: { $0.id == id }) else { return }
         guard commit({ library in
@@ -160,7 +222,7 @@ final class ColorStore: ObservableObject {
     @discardableResult
     func add(_ value: ColorValue, source: ColorSource) -> UUID? {
         let collectionID: UUID? = if case .collection(let id) = filter { id } else { nil }
-        let record = SavedColor(name: value.hex, value: value, collectionID: collectionID, source: source)
+        let record = SavedColor(name: value.suggestedName, value: value, collectionID: collectionID, source: source)
         commit { $0.colors.insert(record, at: 0) }
         guard library.colors.contains(where: { $0.id == record.id }) else { return nil }
         search = ""
@@ -183,7 +245,7 @@ final class ColorStore: ObservableObject {
         guard let capture = screenPalette else { return }
         let existing = library.colors.first { $0.source.capture?.id == capture.id && $0.value == value }
         let role = capture.role(for: value)
-        let record = existing ?? SavedColor(name: name ?? role?.rawValue ?? value.hex, value: value, createdAt: capture.createdAt,
+        let record = existing ?? SavedColor(name: name ?? value.suggestedName, value: value, createdAt: capture.createdAt,
                                             source: capture.source(proportion: proportion, x: x, y: y, role: role))
         if existing == nil {
             guard commit({ $0.colors.insert(record, at: 0) }) else { return }
@@ -215,12 +277,35 @@ final class ColorStore: ObservableObject {
                     library.colors[index].updatedAt = Date()
                 } else {
                     let role = capture.role(for: color.value)
-                    library.colors.insert(SavedColor(name: role?.rawValue ?? color.value.hex, value: color.value, createdAt: capture.createdAt,
-                                                     collectionID: collection.id, source: capture.source(proportion: color.proportion, role: role)), at: 0)
+                    let sample = selection == .curated ? capture.record.samples?.first(where: { $0.color == color.value }) : nil
+                    library.colors.insert(SavedColor(name: color.value.suggestedName, value: color.value, createdAt: capture.createdAt,
+                                                     collectionID: collection.id, source: capture.source(proportion: selection == .curated ? nil : color.proportion, x: sample?.x, y: sample?.y, role: role)), at: 0)
                 }
             }
         }) else { return }
         notify("Saved \(colors.count) colors to \(uniqueName)")
+    }
+
+    @discardableResult
+    func copyValues(_ colors: [ColorValue]) -> Bool {
+        guard !colors.isEmpty else { return false }
+        NSPasteboard.general.clearContents()
+        guard NSPasteboard.general.setString(colors.map { $0.formatted(copyFormat) }.joined(separator: "\n"), forType: .string) else {
+            error = "Could not copy the palette. Please try again."; return false
+        }
+        notify("Copied \(colors.count) colors")
+        return true
+    }
+
+    func keepSuggestedColor(_ value: ColorValue, from base: SavedColor) {
+        let record = library.colors.first(where: { $0.value == value && $0.source.method == "Color harmony" })
+            ?? SavedColor(name: value.suggestedName, value: value, source: ColorSource(method: "Color harmony"))
+        if !library.colors.contains(where: { $0.id == record.id }) {
+            var saved = record
+            saved.notes = "Harmony based on \(base.displayName) · \(base.value.hex)"
+            guard commit({ $0.colors.insert(saved, at: 0) }) else { return }
+        }
+        copy(record)
     }
 
     @discardableResult

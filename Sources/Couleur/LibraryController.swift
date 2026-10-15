@@ -2,7 +2,7 @@ import AppKit
 import Combine
 import SwiftUI
 
-/// AppKit owns window chrome, toolbar search, split resizing, and sidebar materials.
+/// Two destinations, one canvas, and an optional inspector.
 @MainActor
 final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegate, NSMenuDelegate {
     private weak var window: NSWindow?
@@ -15,11 +15,9 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
     private var observations: Set<AnyCancellable> = []
     private let searchItem = NSSearchToolbarItem(itemIdentifier: .colorSearch)
     private let libraryToolbar = NSToolbar(identifier: "CouleurLibraryToolbar")
-    private var pickItem: NSToolbarItem?
-    private var captureItem: NSToolbarItem?
-    private var sortItem: NSToolbarItem?
-    private var inspectorItem: NSToolbarItem?
-    private var inspectorBeforeCatalog: Bool?
+    private let destinations = NSSegmentedControl(labels: ["Colors", "Captures"], trackingMode: .selectOne, target: nil, action: nil)
+    private var addItem: NSToolbarItem?
+    private var lastColorFilter: LibraryFilter = .all
 
     init(window: NSWindow, store: ColorStore, captureManager: RegionCapture, pick: @escaping () -> Void,
          capture: @escaping () -> Void, compact: @escaping () -> Void) {
@@ -28,26 +26,25 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
         self.window = window
         super.init()
 
-        let sidebar = NSSplitViewItem(sidebarWithViewController: NSHostingController(rootView: LibrarySidebar(store: store)))
-        sidebar.minimumThickness = 175
-        sidebar.maximumThickness = 240
-        sidebar.preferredThicknessFraction = 0.19
-        sidebar.canCollapseFromWindowResize = false
         let content = NSSplitViewItem(viewController: NSHostingController(rootView: LibraryView(store: store, capture: captureManager, pick: pick)))
-        content.minimumThickness = 300
+        content.minimumThickness = 360
         content.holdingPriority = .defaultLow
         inspector = NSSplitViewItem(inspectorWithViewController: InspectorHost(store: store))
         inspector.minimumThickness = 260
         inspector.maximumThickness = 300
         inspector.preferredThicknessFraction = 0.26
+        inspector.isCollapsed = true
         split.splitView.isVertical = true
         split.splitView.dividerStyle = .thin
-        split.addSplitViewItem(sidebar)
         split.addSplitViewItem(content)
         split.addSplitViewItem(inspector)
         libraryToolbar.delegate = self
         libraryToolbar.displayMode = .iconOnly
         libraryToolbar.allowsUserCustomization = false
+        destinations.target = self
+        destinations.action = #selector(changeDestination)
+        destinations.segmentStyle = .rounded
+        destinations.setAccessibilityLabel("Library")
 
         store.objectWillChange.sink { [weak self] in
             // Published sends before the mutation; refresh chrome after the values settle.
@@ -64,6 +61,7 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
         split.view.frame = NSRect(origin: .zero, size: window.contentView?.bounds.size ?? window.frame.size)
         window.contentViewController = split
         window.toolbarStyle = .unified
+        window.titleVisibility = .hidden
         window.titlebarSeparatorStyle = .none
         window.toolbar = libraryToolbar
         refreshChrome()
@@ -76,24 +74,22 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
     }
 
     private func refreshChrome() {
-        if store.filter == .captures {
-            if inspectorBeforeCatalog == nil { inspectorBeforeCatalog = inspector.isCollapsed }
-            inspector.isCollapsed = true
-        } else if let previous = inspectorBeforeCatalog {
-            inspector.isCollapsed = previous
-            inspectorBeforeCatalog = nil
-        }
-        inspectorItem?.isEnabled = store.filter != .captures
         let searchingCaptures = store.filter == .captures || store.filter == .capture
+        let collapseDetails = searchingCaptures || !store.detailsVisible
+        if inspector.isCollapsed != collapseDetails {
+            if window?.contentViewController === split && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                inspector.animator().isCollapsed = collapseDetails
+            } else { inspector.isCollapsed = collapseDetails }
+        }
+        destinations.selectedSegment = searchingCaptures ? 1 : 0
+        if !searchingCaptures { lastColorFilter = store.filter }
         searchItem.searchField.placeholderString = searchingCaptures ? "Search captures" : "Search colors"
         searchItem.searchField.setAccessibilityLabel(searchingCaptures ? "Search captures" : "Search colors")
         if window?.contentViewController === split {
             window?.title = store.filter == .all ? "All Colors" : store.filterTitle
         }
         if searchItem.searchField.stringValue != store.search { searchItem.searchField.stringValue = store.search }
-        pickItem?.isEnabled = !store.isSampling && !store.readOnly
-        captureItem?.isEnabled = !store.isSampling && !store.readOnly
-        sortItem?.isEnabled = store.filter != .capture
+        addItem?.isEnabled = !store.isSampling && !store.isExtracting && !store.readOnly
     }
 
     func controlTextDidChange(_ obj: Notification) {
@@ -103,61 +99,50 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.toggleSidebar, .colorSidebarSeparator, .flexibleSpace, .colorPick, .colorCapture, .colorSort, .colorSearch, .colorCompact, .colorInspectorSeparator, .colorInspector]
+        [.colorDestinations, .flexibleSpace, .colorSearch, .colorAdd, .colorCompact]
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         toolbarDefaultItemIdentifiers(toolbar)
     }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         switch id {
-        case .colorSidebarSeparator:
-            return NSTrackingSeparatorToolbarItem(identifier: id, splitView: split.splitView, dividerIndex: 0)
-        case .colorInspectorSeparator:
-            return NSTrackingSeparatorToolbarItem(identifier: id, splitView: split.splitView, dividerIndex: 1)
-        case .toggleSidebar:
-            return button(id, "Toggle Sidebar", symbol: "sidebar.left", action: #selector(toggleSidebar))
-        case .colorPick:
-            let item = button(id, "Pick Color", symbol: "eyedropper", action: #selector(pickColor))
-            item.toolTip = "Pick from screen · ⌃⌥C"
-            pickItem = item
+        case .colorDestinations:
+            let item = NSToolbarItem(itemIdentifier: id)
+            item.label = "Library"
+            item.view = destinations
+            item.visibilityPriority = .high
             return item
         case .colorCompact:
             let item = button(id, "Compact Picker", symbol: "arrow.down.right.and.arrow.up.left", action: #selector(showCompact))
             item.toolTip = "Return to compact picker · ⌘2"
             item.visibilityPriority = .high
             return item
-        case .colorCapture:
-            let item = button(id, "Capture Palette", symbol: "viewfinder", action: #selector(capturePalette))
-            item.toolTip = "Capture a screen area · ⌘⇧A"
-            item.visibilityPriority = .high
-            captureItem = item
-            return item
-        case .colorInspector:
-            let item = button(id, "Toggle Inspector", symbol: "sidebar.right", action: #selector(toggleInspector))
-            item.isEnabled = store.filter != .captures
-            inspectorItem = item
-            return item
-        case .colorSort:
+        case .colorAdd:
             let item = NSMenuToolbarItem(itemIdentifier: id)
-            item.label = "Sort Colors"
-            item.image = NSImage(systemSymbolName: "arrow.up.arrow.down", accessibilityDescription: "Sort colors")
-            item.toolTip = "Sort colors"
+            item.label = "Add"
+            item.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "Add a color or image")
+            item.toolTip = "Add a color or image"
+            item.autovalidates = false
             let menu = NSMenu()
             menu.delegate = self
-            for sort in LibrarySort.allCases {
-                let option = NSMenuItem(title: sort.rawValue, action: #selector(changeSort(_:)), keyEquivalent: "")
-                option.target = self; option.representedObject = sort.rawValue
+            menu.autoenablesItems = false
+            for (title, symbol, action) in [("Pick color", "eyedropper", #selector(pickColor)),
+                                          ("Capture area", "viewfinder", #selector(capturePalette)),
+                                          ("Open image…", "photo", #selector(importImage))] {
+                let option = NSMenuItem(title: title, action: action, keyEquivalent: "")
+                option.target = self
+                option.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
                 menu.addItem(option)
             }
             item.menu = menu
-            sortItem = item
+            addItem = item
             return item
         case .colorSearch:
             searchItem.label = "Search Colors"
             searchItem.searchField.placeholderString = "Search colors"
             searchItem.searchField.delegate = self
             searchItem.searchField.sendsSearchStringImmediately = true
-            searchItem.preferredWidthForSearchField = 200
+            searchItem.preferredWidthForSearchField = 180
             searchItem.searchField.setAccessibilityLabel("Search colors")
             return searchItem
         default: return nil
@@ -171,27 +156,28 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
         item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: title)
         item.target = self
         item.action = action
+        item.autovalidates = false
         return item
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         for item in menu.items {
-            item.state = item.representedObject as? String == store.sort.rawValue ? .on : .off
-            item.isEnabled = store.filter != .captures || item.representedObject as? String != LibrarySort.hue.rawValue
+            item.isEnabled = !store.isSampling && !store.isExtracting && !store.readOnly
         }
     }
-    @objc private func changeSort(_ sender: NSMenuItem) {
-        if let raw = sender.representedObject as? String, let sort = LibrarySort(rawValue: raw) { store.sort = sort }
+    @objc private func changeDestination() {
+        store.search = ""
+        if destinations.selectedSegment == 1 { store.showCaptures() }
+        else {
+            if case .collection(let id) = lastColorFilter, !store.library.collections.contains(where: { $0.id == id }) { lastColorFilter = .all }
+            store.filter = lastColorFilter
+        }
+        window?.makeFirstResponder(nil)
     }
     @objc private func pickColor() { pick() }
     @objc private func capturePalette() { capture() }
+    @objc private func importImage() { store.importImage() }
     @objc private func showCompact() { compact() }
-    @objc private func toggleSidebar() { toggle(split.splitViewItems[0]) }
-    @objc private func toggleInspector() { toggle(inspector) }
-    private func toggle(_ item: NSSplitViewItem) {
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion { item.isCollapsed.toggle() }
-        else { item.animator().isCollapsed = !item.isCollapsed }
-    }
 }
 
 /// A single AppKit safe-area boundary prevents the window and SwiftUI's root
@@ -219,12 +205,8 @@ private final class InspectorHost: NSViewController {
 }
 
 private extension NSToolbarItem.Identifier {
-    static let colorSidebarSeparator = Self("ColorSidebarSeparator")
-    static let colorInspectorSeparator = Self("ColorInspectorSeparator")
-    static let colorPick = Self("ColorPick")
-    static let colorCapture = Self("ColorCapture")
-    static let colorSort = Self("ColorSort")
+    static let colorDestinations = Self("ColorDestinations")
+    static let colorAdd = Self("ColorAdd")
     static let colorSearch = Self("ColorSearch")
     static let colorCompact = Self("ColorCompact")
-    static let colorInspector = Self("ColorInspector")
 }

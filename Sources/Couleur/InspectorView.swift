@@ -37,17 +37,10 @@ struct InspectorView: View {
                 copyValue
                 Divider()
                 organization
-                Divider()
-                source
-                notes
-                HStack(spacing: 4) {
-                    Image(systemName: store.error == nil ? "checkmark" : "exclamationmark.circle")
-                    Text(store.error == nil && !store.readOnly ? "Saved on this Mac" : "Check library status")
-                    Spacer()
-                    Button { store.delete(record.id) } label: { Image(systemName: "trash").frame(width: 24, height: 24) }
-                        .buttonStyle(QuietButtonStyle()).help("Delete color").accessibilityLabel("Delete color")
-                        .disabled(store.readOnly)
-                }.font(.system(size: 10)).foregroundStyle(.secondary)
+                ColorHarmonyView(store: store, record: record)
+                DisclosureGroup("Source & notes") {
+                    VStack(alignment: .leading, spacing: 20) { source; notes }.padding(.top, 12)
+                }.font(.system(size: 12)).foregroundStyle(.secondary)
             }.padding(20)
         }
     }
@@ -55,7 +48,7 @@ struct InspectorView: View {
     private var preview: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Color").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                Text("Details").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
                 Spacer()
                 ColorPicker("Adjust color", selection: Binding(get: { record.value.color }, set: { color in
                     if let value = ColorValue(NSColor(color)) { store.update(record.id) { $0.value = value } }
@@ -69,10 +62,21 @@ struct InspectorView: View {
                     .help(record.favorite ? "Remove favorite" : "Add favorite").accessibilityLabel("Favorite color")
                     .accessibilityValue(record.favorite ? "Favorite" : "Not a favorite")
             }
-            Swatch(value: record.value).frame(height: 122).modifier(SwatchRim(radius: 8))
-            TextField("Name this color", text: binding(\.name), axis: .vertical)
+            Swatch(value: record.value).frame(height: 96).modifier(SwatchRim(radius: 8))
+            TextField("Name this color", text: Binding(get: {
+                store.library.colors.first { $0.id == record.id }?.displayName ?? record.displayName
+            }, set: { name in store.update(record.id) { $0.name = name } }), axis: .vertical)
                 .font(.system(size: 17, weight: .semibold)).textFieldStyle(.plain).lineLimit(1...3)
                 .accessibilityLabel("Color name").disabled(store.readOnly)
+            HStack(spacing: 6) {
+                Text(record.value.family.rawValue).font(.system(size: 10)).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                if !record.name.isEmpty && record.name.uppercased() != record.value.hex && record.name != record.value.suggestedName {
+                    Button("Use \(record.value.suggestedName)") { store.update(record.id) { $0.name = record.value.suggestedName } }
+                        .font(.system(size: 10)).buttonStyle(.link).disabled(store.readOnly)
+                        .help("Use the suggested color name")
+                }
+            }
         }
     }
 

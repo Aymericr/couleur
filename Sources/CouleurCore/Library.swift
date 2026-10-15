@@ -70,7 +70,7 @@ public struct ColorCollection: Codable, Equatable, Identifiable, Sendable {
 }
 
 public struct ColorLibrary: Codable, Equatable, Sendable {
-    public var version: Int = 2
+    public var version: Int = 3
     public var colors: [SavedColor] = []
     public var collections: [ColorCollection] = []
     public var captures: [SavedCapture] = []
@@ -80,15 +80,15 @@ public struct ColorLibrary: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         let storedVersion = try values.decode(Int.self, forKey: .version)
-        guard (1...2).contains(storedVersion) else { throw LibraryError.unsupportedVersion(storedVersion) }
-        version = 2
+        guard (1...3).contains(storedVersion) else { throw LibraryError.unsupportedVersion(storedVersion) }
+        version = 3
         colors = try values.decode([SavedColor].self, forKey: .colors)
         collections = try values.decode([ColorCollection].self, forKey: .collections)
         captures = try values.decodeIfPresent([SavedCapture].self, forKey: .captures) ?? []
     }
 
     public func validate() throws {
-        guard version == 2 else { throw LibraryError.unsupportedVersion(version) }
+        guard version == 3 else { throw LibraryError.unsupportedVersion(version) }
         guard colors.allSatisfy({ color in
             color.value.isValid && (color.source.capture?.isValid ?? true)
                 && [color.source.x, color.source.y].compactMap { $0 }.allSatisfy { $0.isFinite && abs($0) <= 10_000_000 }

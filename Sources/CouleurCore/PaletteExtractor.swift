@@ -5,6 +5,7 @@ public struct PaletteColor: Codable, Equatable, Identifiable, Sendable {
     /// Fraction of sampled, visible pixels assigned to this color group.
     public var proportion: Double
     public var id: String { value.hex }
+    public init(value: ColorValue, proportion: Double) { self.value = value; self.proportion = proportion }
 }
 
 public struct ExtractedPalette: Codable, Equatable, Sendable {

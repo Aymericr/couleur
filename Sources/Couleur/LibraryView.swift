@@ -2,86 +2,70 @@ import AppKit
 import CouleurCore
 import SwiftUI
 
-struct LibrarySidebar: View {
+/// Organization stays local to the color grid; it is not another navigation tree.
+private struct ColorLibraryHeader: View {
     @ObservedObject var store: ColorStore
     @State private var collectionName = ""
     @State private var addingCollection = false
-    @State private var renamingCollection: ColorCollection?
+    @State private var renamingCollection = false
 
-    private var selection: Binding<LibraryFilter?> {
-        Binding(get: { store.filter }, set: { if let value = $0 { store.filter = value } })
+    private var currentCollection: ColorCollection? {
+        guard case .collection(let id) = store.filter else { return nil }
+        return store.library.collections.first { $0.id == id }
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            List(selection: selection) {
-                if store.screenPalette != nil || store.isExtracting {
-                    Section {
-                        Label("Screen Palette", systemImage: "viewfinder").font(.system(size: 13))
-                            .padding(.vertical, 3).tag(LibraryFilter.capture)
+        HStack(spacing: 16) {
+            Menu {
+                Picker("Show", selection: $store.filter) {
+                    Text("All colors").tag(LibraryFilter.all)
+                    Text("Favorites").tag(LibraryFilter.favorites)
+                    if !store.library.collections.isEmpty {
+                        Divider()
+                        ForEach(store.library.collections) { collection in
+                            Text(collection.name).tag(LibraryFilter.collection(collection.id))
+                        }
                     }
+                }.pickerStyle(.inline)
+                Divider()
+                Button("New collection…") { collectionName = ""; addingCollection = true }.disabled(store.readOnly)
+                if let collection = currentCollection {
+                    Button("Rename collection…") { collectionName = collection.name; renamingCollection = true }.disabled(store.readOnly)
+                    Button("Remove collection", role: .destructive) { store.removeCollection(collection.id) }.disabled(store.readOnly)
                 }
-                Section("Library") {
-                    row("All Colors", icon: "square.grid.2x2", filter: .all, count: store.library.colors.count)
-                    row("Captures", icon: "rectangle.stack", filter: .captures, count: store.library.captures.count)
-                    row("Favorites", icon: "star", filter: .favorites, count: store.library.colors.filter(\.favorite).count)
-                    row("Unfiled", icon: "tray", filter: .unfiled, count: store.library.colors.filter { $0.collectionID == nil }.count)
-                }
-                Section("Collections") {
-                    ForEach(store.library.collections) { collection in
-                        row(collection.name, icon: "folder", filter: .collection(collection.id), count: store.library.colors.filter { $0.collectionID == collection.id }.count)
-                            .contextMenu {
-                                Button("Rename…") { collectionName = collection.name; renamingCollection = collection }
-                                Button("Remove collection", role: .destructive) { store.removeCollection(collection.id) }
-                            }
-                    }
-                    if store.library.collections.isEmpty {
-                        Text("No collections yet").font(.system(size: 12)).foregroundStyle(.tertiary)
-                            .selectionDisabled()
-                    }
-                }
-            }.listStyle(.sidebar)
-            HStack {
-                Button { collectionName = ""; addingCollection = true } label: {
-                    Label("New Collection", systemImage: "plus")
-                }.buttonStyle(QuietButtonStyle()).disabled(store.readOnly)
-                Spacer(minLength: 2)
-                Menu {
-                    Toggle("Copy automatically after picking", isOn: $store.autoCopy)
-                    Toggle("Remember source websites", isOn: $store.rememberWebsites)
-                    Divider()
-                    Button("Paste color from clipboard", action: store.paste)
-                    Divider()
-                    Button("Import library…", action: store.importLibrary)
-                    Button("Export library…", action: store.exportLibrary)
-                    Button("Reveal library folder", action: store.revealLibrary)
-                } label: { Image(systemName: "ellipsis.circle") }
-                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                    .help("Library options").accessibilityLabel("Library options")
-            }.font(.system(size: 11)).foregroundStyle(.secondary).padding(14)
-        }
-        .alert("New Collection", isPresented: $addingCollection) {
-            TextField("Collection name", text: $collectionName)
-            Button("Create") { store.addCollection(collectionName); collectionName = "" }
-                .disabled(collectionName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            Button("Cancel", role: .cancel) { collectionName = "" }
-        }
-        .alert("Rename Collection", isPresented: Binding(get: { renamingCollection != nil }, set: { if !$0 { renamingCollection = nil } })) {
-            TextField("Collection name", text: $collectionName)
-            Button("Rename") {
-                if let collection = renamingCollection { store.renameCollection(collection.id, name: collectionName) }
-                renamingCollection = nil; collectionName = ""
+            } label: {
+                HStack(spacing: 7) {
+                    Text(store.filterTitle).font(.system(size: 17, weight: .semibold)).tracking(-0.3).foregroundStyle(.primary)
+                    Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+                }.padding(.vertical, 4)
+            }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                .accessibilityLabel("Show colors").help("All colors, favorites, and your collections")
+            Spacer(minLength: 8)
+            Menu {
+                Picker("Sort colors", selection: $store.sort) {
+                    ForEach(LibrarySort.allCases) { sort in Text(sort.rawValue).tag(sort) }
+                }.pickerStyle(.inline)
+            } label: { Image(systemName: "arrow.up.arrow.down").frame(width: 24, height: 24) }
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                .accessibilityLabel("Sort colors").help("Sort colors")
+            Button { store.detailsVisible.toggle() } label: {
+                Image(systemName: store.detailsVisible ? "info.circle.fill" : "info.circle").frame(width: 24, height: 24)
+            }.buttonStyle(QuietButtonStyle()).disabled(store.selected == nil)
+                .accessibilityLabel(store.detailsVisible ? "Hide color details" : "Show color details")
+                .help(store.detailsVisible ? "Hide color details" : "Name, organize, and explore the selected color")
+        }.foregroundStyle(.secondary)
+            .alert("New Collection", isPresented: $addingCollection) {
+                TextField("Collection name", text: $collectionName)
+                Button("Create") { store.addCollection(collectionName) }
+                    .disabled(collectionName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("Cancel", role: .cancel) {}
             }
-            Button("Cancel", role: .cancel) { renamingCollection = nil }
-        }
-    }
-
-    private func row(_ title: String, icon: String, filter: LibraryFilter, count: Int) -> some View {
-        HStack(spacing: 8) {
-            Label(title, systemImage: icon)
-            Spacer(minLength: 3)
-            Text(count.formatted()).font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
-        }.font(.system(size: 13)).padding(.vertical, 3).tag(filter)
+            .alert("Rename Collection", isPresented: $renamingCollection) {
+                TextField("Collection name", text: $collectionName)
+                Button("Rename") { if let collection = currentCollection { store.renameCollection(collection.id, name: collectionName) } }
+                    .disabled(collectionName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("Cancel", role: .cancel) {}
+            }
     }
 }
 
@@ -103,8 +87,11 @@ struct LibraryView: View {
                     CapturePaletteView(store: store, capture: capture).id(capture.id)
                 } else { emptyState }
             } else if store.filter == .captures { CaptureCatalogView(store: store, capture: { capture.capture() }) }
-            else if store.visible.isEmpty { emptyState }
-            else { colorGrid }
+            else {
+                ColorLibraryHeader(store: store).padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 8)
+                if store.visible.isEmpty { emptyState }
+                else { colorGrid }
+            }
             HStack(spacing: 6) {
                 if store.filter == .capture { Text("Saved on this Mac") }
                 else if store.filter == .captures { Text("\(store.visibleCaptures.count) \(store.visibleCaptures.count == 1 ? "capture" : "captures")") }
@@ -114,7 +101,7 @@ struct LibraryView: View {
                     Image(systemName: "checkmark").font(.system(size: 10, weight: .medium))
                     Text(message)
                 } else {
-                    Text(store.filter == .capture ? "Click a color to copy & keep" : store.filter == .captures ? "Images and palettes, together" : "Click a color to copy")
+                    Text(store.filter == .capture ? "Click a palette color to copy & keep" : store.filter == .captures ? "Images and palettes, together" : "Click a color to copy")
                 }
             }.font(.system(size: 11)).foregroundStyle(.secondary)
                 .padding(.horizontal, 22).frame(height: 32)
@@ -133,15 +120,15 @@ struct LibraryView: View {
 
     private var colorGrid: some View {
         GeometryReader { geometry in
-            let columns = max(1, Int((geometry.size.width - 32) / 152))
+            let columns = max(2, Int((geometry.size.width - 32) / 144))
             ScrollViewReader { scroll in
                 ScrollView {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: columns), spacing: 22) {
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: columns), spacing: 22) {
                         ForEach(store.visible) { record in
                             ColorTile(store: store, record: record) { store.selectedID = record.id; gridFocused = true }
                                 .id(record.id)
                         }
-                    }.padding(22)
+                        }.padding(24)
                 }
                 .focusable().focused($gridFocused).focusEffectDisabled()
                 .onMoveCommand { direction in moveSelection(direction, columns: columns) }
@@ -203,7 +190,6 @@ private struct ColorTile: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var selected: Bool { store.selectedID == record.id }
     private var copied: Bool { store.copiedColorID == record.id }
-    private var named: Bool { !record.name.isEmpty && record.name != record.value.hex }
 
     var body: some View {
         Button {
@@ -211,10 +197,10 @@ private struct ColorTile: View {
             store.copy(record)
         } label: {
             VStack(alignment: .leading, spacing: 9) {
-                Swatch(value: record.value).aspectRatio(1.25, contentMode: .fit)
-                    .modifier(SwatchRim(radius: 8))
+                Swatch(value: record.value).aspectRatio(1.35, contentMode: .fit)
+                    .modifier(SwatchRim(radius: 11))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 11).strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2)
+                        RoundedRectangle(cornerRadius: 15).strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2)
                             .padding(-4)
                     }
                     .overlay(alignment: .topLeading) {
@@ -237,14 +223,13 @@ private struct ColorTile: View {
                     }
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {
-                        Text(record.name.isEmpty ? record.value.hex : record.name)
-                            .font(.system(size: 12, weight: .medium, design: named ? .default : .monospaced))
+                        Text(record.displayName)
+                            .font(.system(size: 12, weight: .medium))
                             .lineLimit(1).foregroundStyle(selected ? Color.accentColor : .primary)
                         Spacer(minLength: 0)
-                        SourceIcon(source: record.source, size: 13)
                     }
-                    Text(named ? record.value.hex : (record.source.appName ?? record.source.method))
-                        .font(.system(size: 10, design: named ? .monospaced : .default))
+                    Text(record.value.hex)
+                        .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary).lineLimit(1)
                 }.padding(.horizontal, 1)
             }
@@ -252,7 +237,7 @@ private struct ColorTile: View {
             .background(.primary.opacity(hovered ? 0.025 : 0), in: RoundedRectangle(cornerRadius: 11))
             .contentShape(Rectangle())
         }.buttonStyle(QuietButtonStyle())
-            .accessibilityLabel("\(record.name), \(record.value.hex)")
+            .accessibilityLabel("\(record.displayName), \(record.value.hex)")
             .accessibilityValue(copied ? "Copied" : record.value.formatted(store.copyFormat))
             .accessibilityHint("Click to copy \(store.copyFormat.rawValue)")
             .accessibilityAddTraits(selected ? .isSelected : [])
@@ -260,6 +245,8 @@ private struct ColorTile: View {
             .accessibilityAction(named: "Delete color") { store.delete(record.id) }
             .help("\(record.source.appName.map { "Picked from \($0) · " } ?? "")Click to copy \(store.copyFormat.rawValue)")
             .contextMenu {
+                Button("Show details") { store.selectedID = record.id; store.detailsVisible = true }
+                Divider()
                 Button("Copy \(store.copyFormat.rawValue)") { store.copy(record) }
                 Menu("Copy as") { ForEach(CopyFormat.allCases) { format in Button(format.rawValue) { store.copy(record, as: format) } } }
                 Divider()
