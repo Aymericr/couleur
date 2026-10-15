@@ -52,9 +52,11 @@ final class ColorStore: ObservableObject {
 
     var selected: SavedColor? { library.colors.first { $0.id == selectedID } }
     var recent: [SavedColor] { Array(library.colors.sorted { $0.createdAt > $1.createdAt }.prefix(8)) }
-    var visible: [SavedColor] {
+    var catalog: ColorCatalog { ColorCatalog(colors: filteredColors, sort: sort) }
+    var visible: [SavedColor] { catalog.colors }
+    private var filteredColors: [SavedColor] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        let colors = library.colors.filter { color in
+        return library.colors.filter { color in
             let matches: Bool
             switch filter {
             case .capture, .captures: matches = false
@@ -63,15 +65,8 @@ final class ColorStore: ObservableObject {
             case .unfiled: matches = color.collectionID == nil
             case .collection(let id): matches = color.collectionID == id
             }
-            return matches && (query.isEmpty || [color.name, color.displayName, color.value.family.rawValue, color.value.hex, color.notes, color.source.appName ?? "", color.source.windowTitle ?? "", color.sourceURL, collectionName(color.collectionID)]
+            return matches && (query.isEmpty || [color.name, color.displayName, color.value.family.rawValue, color.value.hex, color.notes, ColorProvenance.appName(color.source), color.source.windowTitle ?? "", color.sourceURL, color.source.websiteURL ?? "", collectionName(color.collectionID)]
                 .contains { $0.localizedCaseInsensitiveContains(query) })
-        }
-        return colors.sorted { a, b in
-            switch sort {
-            case .newest: return a.createdAt > b.createdAt
-            case .name: return a.displayName.localizedStandardCompare(b.displayName) == .orderedAscending
-            case .hue: return a.value.hsl.hue < b.value.hsl.hue
-            }
         }
     }
 
@@ -497,7 +492,3 @@ final class ColorStore: ObservableObject {
 }
 
 enum LibraryFilter: Hashable { case all, favorites, unfiled, collection(UUID), capture, captures }
-enum LibrarySort: String, CaseIterable, Identifiable {
-    case newest = "Newest first", name = "Name", hue = "Hue"
-    var id: String { rawValue }
-}

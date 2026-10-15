@@ -203,7 +203,7 @@ private struct RecentSwatch: View {
                 }
                 .frame(width: 24, height: 34)
         }.buttonStyle(QuietButtonStyle())
-            .help("Copy \(record.name) · \(record.value.hex)")
+            .help("\(record.displayName) · \(record.value.hex)\n\(ColorProvenance.summary(record))\nClick to copy \(store.copyFormat.rawValue)")
             .accessibilityLabel("Copy recent color \(record.name)")
             .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityAction(named: "Delete color") { store.delete(record.id) }

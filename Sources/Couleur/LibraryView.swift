@@ -2,73 +2,6 @@ import AppKit
 import CouleurCore
 import SwiftUI
 
-/// Organization stays local to the color grid; it is not another navigation tree.
-private struct ColorLibraryHeader: View {
-    @ObservedObject var store: ColorStore
-    @State private var collectionName = ""
-    @State private var addingCollection = false
-    @State private var renamingCollection = false
-
-    private var currentCollection: ColorCollection? {
-        guard case .collection(let id) = store.filter else { return nil }
-        return store.library.collections.first { $0.id == id }
-    }
-
-    var body: some View {
-        HStack(spacing: 16) {
-            Menu {
-                Picker("Show", selection: $store.filter) {
-                    Text("All colors").tag(LibraryFilter.all)
-                    Text("Favorites").tag(LibraryFilter.favorites)
-                    if !store.library.collections.isEmpty {
-                        Divider()
-                        ForEach(store.library.collections) { collection in
-                            Text(collection.name).tag(LibraryFilter.collection(collection.id))
-                        }
-                    }
-                }.pickerStyle(.inline)
-                Divider()
-                Button("New collection…") { collectionName = ""; addingCollection = true }.disabled(store.readOnly)
-                if let collection = currentCollection {
-                    Button("Rename collection…") { collectionName = collection.name; renamingCollection = true }.disabled(store.readOnly)
-                    Button("Remove collection", role: .destructive) { store.removeCollection(collection.id) }.disabled(store.readOnly)
-                }
-            } label: {
-                HStack(spacing: 7) {
-                    Text(store.filterTitle).font(.geist(size: 17, weight: .semibold)).tracking(-0.3).foregroundStyle(.primary)
-                    Image(systemName: "chevron.down").font(.geist(size: 9, weight: .semibold)).foregroundStyle(.secondary)
-                }.padding(.vertical, 4)
-            }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                .accessibilityLabel("Show colors").help("All colors, favorites, and your collections")
-            Spacer(minLength: 8)
-            Menu {
-                Picker("Sort colors", selection: $store.sort) {
-                    ForEach(LibrarySort.allCases) { sort in Text(sort.rawValue).tag(sort) }
-                }.pickerStyle(.inline)
-            } label: { Image(systemName: "arrow.up.arrow.down").frame(width: 24, height: 24) }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                .accessibilityLabel("Sort colors").help("Sort colors")
-            Button { store.detailsVisible.toggle() } label: {
-                Image(systemName: store.detailsVisible ? "info.circle.fill" : "info.circle").frame(width: 24, height: 24)
-            }.buttonStyle(QuietButtonStyle()).disabled(store.selected == nil)
-                .accessibilityLabel(store.detailsVisible ? "Hide color details" : "Show color details")
-                .help(store.detailsVisible ? "Hide color details" : "Name, organize, and explore the selected color")
-        }.foregroundStyle(.secondary)
-            .alert("New Collection", isPresented: $addingCollection) {
-                TextField("Collection name", text: $collectionName)
-                Button("Create") { store.addCollection(collectionName) }
-                    .disabled(collectionName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Button("Cancel", role: .cancel) {}
-            }
-            .alert("Rename Collection", isPresented: $renamingCollection) {
-                TextField("Collection name", text: $collectionName)
-                Button("Rename") { if let collection = currentCollection { store.renameCollection(collection.id, name: collectionName) } }
-                    .disabled(collectionName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Button("Cancel", role: .cancel) {}
-            }
-    }
-}
-
 struct LibraryView: View {
     @ObservedObject var store: ColorStore
     @ObservedObject var capture: RegionCapture
@@ -88,7 +21,7 @@ struct LibraryView: View {
                 } else { emptyState }
             } else if store.filter == .captures { CaptureCatalogView(store: store, capture: { capture.capture() }) }
             else {
-                ColorLibraryHeader(store: store).padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 8)
+                ColorLibraryHeader(store: store).padding(.horizontal, 24).padding(.top, 14).padding(.bottom, 8)
                 if store.visible.isEmpty { emptyState }
                 else { colorGrid }
             }
@@ -117,23 +50,44 @@ struct LibraryView: View {
         } message: { Text(store.error ?? "") }
         .onChange(of: store.filter) { _, _ in selectFirstVisible() }
         .onChange(of: store.search) { _, _ in selectFirstVisible() }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in store.objectWillChange.send() }
     }
 
     private var colorGrid: some View {
         GeometryReader { geometry in
             let columns = max(2, Int((geometry.size.width - 32) / 144))
+            let catalog = store.catalog
+            let compactGroups = store.sort == .hue || store.sort == .app
             ScrollViewReader { scroll in
                 ScrollView {
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: columns), spacing: 22) {
-                        ForEach(store.visible) { record in
-                            ColorTile(store: store, record: record) { store.selectedID = record.id; gridFocused = true }
-                                .id(record.id)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: columns), spacing: compactGroups ? 14 : 22) {
+                        ForEach(catalog.entries) { entry in
+                            switch entry {
+                            case .color(let record):
+                                ColorTile(store: store, record: record, compact: compactGroups) { store.selectedID = record.id; gridFocused = true }
+                                    .id(record.id).transition(.opacity)
+                            case .heading(let group):
+                                Section {} header: {
+                                    HStack(spacing: 7) {
+                                        if let source = group.source { SourceIcon(source: source, size: 15) }
+                                        Text(group.title ?? "").font(.geist(size: 12, weight: .medium))
+                                        Text(group.colors.count.formatted()).font(.geist(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                                        Spacer()
+                                    }.padding(.horizontal, 4).padding(.top, group.id == catalog.groups.first?.id ? 0 : 10)
+                                        .accessibilityElement(children: .combine).accessibilityAddTraits(.isHeader)
+                                        .transition(.opacity)
+                                }
+                            }
                         }
-                        }.padding(24)
+                    }.padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 24)
+                        .id("catalog-top")
                 }
                 .focusable().focused($gridFocused).focusEffectDisabled()
-                .onMoveCommand { direction in moveSelection(direction, columns: columns) }
+                .onMoveCommand { direction in moveSelection(direction, catalog: catalog, columns: columns) }
                 .onChange(of: store.selectedID) { _, id in if let id { scroll.scrollTo(id) } }
+                .onChange(of: store.sort) { _, _ in withAnimation(nil) { scroll.scrollTo("catalog-top", anchor: .top) } }
+                .onChange(of: store.filter) { _, _ in withAnimation(nil) { scroll.scrollTo("catalog-top", anchor: .top) } }
+                .onChange(of: store.search) { _, _ in withAnimation(nil) { scroll.scrollTo("catalog-top", anchor: .top) } }
             }
         }
     }
@@ -167,25 +121,23 @@ struct LibraryView: View {
         guard store.filter != .capture else { return }
         if !store.visible.contains(where: { $0.id == store.selectedID }) { store.selectedID = store.visible.first?.id }
     }
-    private func moveSelection(_ direction: MoveCommandDirection, columns: Int) {
-        let colors = store.visible
-        guard !colors.isEmpty else { return }
-        let index = colors.firstIndex { $0.id == store.selectedID } ?? 0
-        let offset: Int
+    private func moveSelection(_ direction: MoveCommandDirection, catalog: ColorCatalog, columns: Int) {
+        let movement: ColorCatalog.Direction
         switch direction {
-        case .left: offset = -1
-        case .right: offset = 1
-        case .up: offset = -columns
-        case .down: offset = columns
+        case .left: movement = .left
+        case .right: movement = .right
+        case .up: movement = .up
+        case .down: movement = .down
         default: return
         }
-        store.selectedID = colors[min(max(0, index + offset), colors.count - 1)].id
+        store.selectedID = catalog.neighbor(of: store.selectedID, direction: movement, columns: columns)
     }
 }
 
 private struct ColorTile: View {
     @ObservedObject var store: ColorStore
     let record: SavedColor
+    let compact: Bool
     let select: () -> Void
     @State private var hovered = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -193,12 +145,13 @@ private struct ColorTile: View {
     private var copied: Bool { store.copiedColorID == record.id }
 
     var body: some View {
+        let provenance = ColorProvenance.summary(record)
         Button {
             select()
             store.copy(record)
         } label: {
             VStack(alignment: .leading, spacing: 9) {
-                Swatch(value: record.value).aspectRatio(1.35, contentMode: .fit)
+                Swatch(value: record.value).aspectRatio(compact ? 2.2 : 1.35, contentMode: .fit)
                     .modifier(SwatchRim(radius: 11, hovered: hovered))
                     .overlay {
                         RoundedRectangle(cornerRadius: 15, style: .continuous).strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2)
@@ -232,6 +185,10 @@ private struct ColorTile: View {
                     Text(record.value.hex)
                         .font(.geist(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary).lineLimit(1)
+                    HStack(spacing: 4) {
+                        SourceIcon(source: record.source, size: 12)
+                        Text(ColorProvenance.appName(record.source)).lineLimit(1)
+                    }.font(.geist(size: 10)).foregroundStyle(.secondary).padding(.top, 2)
                 }.padding(.horizontal, 1)
             }
             .padding(4)
@@ -240,11 +197,11 @@ private struct ColorTile: View {
         }.buttonStyle(QuietButtonStyle())
             .accessibilityLabel("\(record.displayName), \(record.value.hex)")
             .accessibilityValue(copied ? "Copied" : record.value.formatted(store.copyFormat))
-            .accessibilityHint("Click to copy \(store.copyFormat.rawValue)")
+            .accessibilityHint("\(provenance)\nClick to copy \(store.copyFormat.rawValue)")
             .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityAction(named: "Copy color") { store.copy(record) }
             .accessibilityAction(named: "Delete color") { store.delete(record.id) }
-            .help("\(record.source.appName.map { "Picked from \($0) · " } ?? "")Click to copy \(store.copyFormat.rawValue)")
+            .help("\(provenance)\nClick to copy \(store.copyFormat.rawValue)")
             .contextMenu {
                 Button("Show details") { store.selectedID = record.id; store.detailsVisible = true }
                 Divider()

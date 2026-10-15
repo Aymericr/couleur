@@ -27,7 +27,9 @@ Every pick is saved immediately and kept across app restarts, with no history li
 
 - Give colors names, mark favorites, and organize them into named collections.
 - New picks get local, editable name suggestions. Older unnamed colors display a suggested name without rewriting the stored record. Personal names remain unchanged.
-- Switch between **Colors** and **Captures** in the top bar. There is no navigation sidebar. The **All colors** dropdown holds favorites and your collections; search also understands color families such as blues, neutrals, and earth tones.
+- Switch between **Colors** and **Captures** in the top bar. All colors, Favorites, and collections are direct filters above the color catalog; the collection strip scrolls when space is tight. **+** creates a collection; right-click a collection to rename or remove it.
+- Arrange the catalog with the visible **Recent / Color family / App / Name** controls. Recent groups by local day, newest first. Color family follows the spectrum with shades from light to dark, then earth tones and neutrals. App groups by provenance with recent colors first; Name keeps a simple alphabetical grid. Family and App use shorter swatches so more groups fit on screen. Arrangement changes move and resize existing tiles with a brief transition and respect Reduce Motion. Filters and search work in every arrangement.
+- Each color tile shows its source app. Hover for **Today at 12:27 PM**, the available website, and the source window title. Older picks show their date and local time. Clipboard, imported-image, and harmony colors keep their own source labels.
 - Open the **ⓘ** details panel, then **Explore harmonies**, for analogous, complementary, triadic, and tonal palettes. Click a suggestion to copy and keep it, or copy the whole palette. Text previews measure contrast on white and ink surfaces, including alpha compositing.
 - Search by name, HEX, app, window title, source URL, collection, or notes.
 - Sort by time, name, or hue.
