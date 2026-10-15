@@ -21,23 +21,11 @@ struct LibraryView: View {
                 } else { emptyState }
             } else if store.filter == .captures { CaptureCatalogView(store: store, capture: { capture.capture() }) }
             else {
-                ColorLibraryHeader(store: store).padding(.horizontal, 24).padding(.top, 14).padding(.bottom, 8)
+                ColorLibraryHeader(store: store).padding(.horizontal, 18).padding(.top, 8).padding(.bottom, 2)
                 if store.visible.isEmpty { emptyState }
                 else { colorGrid }
             }
-            HStack(spacing: 6) {
-                if store.filter == .capture { Text("Saved on this Mac") }
-                else if store.filter == .captures { Text("\(store.visibleCaptures.count) \(store.visibleCaptures.count == 1 ? "capture" : "captures")") }
-                else { Text("\(store.visible.count.formatted()) \(store.visible.count == 1 ? "color" : "colors")") }
-                Spacer()
-                if let message = store.message {
-                    Image(systemName: "checkmark").font(.geist(size: 10, weight: .medium))
-                    Text(message)
-                } else {
-                    Text(store.filter == .capture ? "Click a palette color to copy & keep" : store.filter == .captures ? "Images and palettes, together" : "Click a color to copy")
-                }
-            }.font(.geist(size: 11)).foregroundStyle(.secondary)
-                .padding(.horizontal, 22).frame(height: 32)
+            footer
         }
         .font(.geist(size: 12))
         .background(Color(nsColor: .textBackgroundColor))
@@ -48,6 +36,36 @@ struct LibraryView: View {
         .onChange(of: store.filter) { _, _ in selectFirstVisible() }
         .onChange(of: store.search) { _, _ in selectFirstVisible() }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in store.objectWillChange.send() }
+    }
+
+    private var isColorLibrary: Bool { store.filter != .capture && store.filter != .captures }
+
+    private var footer: some View {
+        HStack(spacing: 10) {
+            if isColorLibrary {
+                Group {
+                    if let message = store.message {
+                        Label(message, systemImage: "checkmark")
+                    } else {
+                        Text("\(store.visible.count.formatted()) \(store.visible.count == 1 ? "color" : "colors")")
+                    }
+                }.lineLimit(1)
+                Spacer(minLength: 8)
+                ColorLibraryArrangement(store: store)
+            } else {
+                if store.filter == .capture { Text("Saved on this Mac") }
+                else { Text("\(store.visibleCaptures.count) \(store.visibleCaptures.count == 1 ? "capture" : "captures")") }
+                Spacer(minLength: 8)
+                if let message = store.message { Label(message, systemImage: "checkmark") }
+                else { Text(store.filter == .capture ? "Click a palette color to copy & keep" : "Images and palettes, together") }
+            }
+        }
+        .font(.geist(size: 11)).foregroundStyle(.secondary)
+        .padding(.leading, 24).padding(.trailing, isColorLibrary ? 16 : 22)
+        .frame(height: isColorLibrary ? 36 : 32)
+        .overlay(alignment: .top) {
+            if isColorLibrary { Rectangle().fill(.primary.opacity(0.06)).frame(height: 0.5) }
+        }
     }
 
     private var colorGrid: some View {

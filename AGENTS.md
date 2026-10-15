@@ -4,6 +4,8 @@ Couleur is a native macOS utility. Keep the everyday picker compact and immediat
 
 Keep Pick color, Capture area, and Open image visible as labeled, direct actions in both sizes. Do not hide these primary capabilities in an Add menu or tiny unlabeled header icons.
 
+Keep library chrome light: one quiet filter/collection row beneath the native toolbar, with direct arrangement choices in the existing footer. Avoid stacking another sorting row above the colors or wrapping every choice in a segmented container.
+
 For interface and motion work, consult the relevant skills from these sources and apply their principles to SwiftUI and AppKit:
 
 - [Emil Kowalski](https://github.com/emilkowalski/skills): animation purpose, frequency, timing, interruption, and Apple design.
