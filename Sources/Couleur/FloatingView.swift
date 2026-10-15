@@ -2,12 +2,13 @@ import AppKit
 import CouleurCore
 import SwiftUI
 
-/// A pocket palette: one color well, one value, and a quiet row of recent picks.
+/// A pocket palette with immediate access to each way of collecting colors.
 struct FloatingView: View {
-    static let size = NSSize(width: 256, height: 158)
+    static let size = NSSize(width: 256, height: 204)
     @ObservedObject var store: ColorStore
     let pick: (Bool) -> Void
     let capture: () -> Void
+    let openImage: () -> Void
     let showLibrary: () -> Void
     let close: () -> Void
     let togglePin: () -> Void
@@ -28,16 +29,18 @@ struct FloatingView: View {
         }
     }
     private var isShortCode: Bool { compactCode.count <= 10 }
+    private var canCollect: Bool { !store.isSampling && !store.isExtracting && !store.readOnly }
     private var rimOpacity: Double { contrast == .increased ? 0.35 : (colorScheme == .dark ? 0.15 : 0.10) }
 
     var body: some View {
         VStack(spacing: 0) {
-            header.frame(height: 36)
+            header.frame(height: 32)
             HStack(spacing: 14) {
                 colorWell
                 valueAndFormat
-            }.padding(.horizontal, 16).frame(height: 70)
-            history.padding(.horizontal, 16).frame(height: 52)
+            }.padding(.horizontal, 16).frame(height: 72)
+            history.padding(.horizontal, 16).frame(height: 40)
+            actions.padding(.horizontal, 12).frame(height: 48).padding(.bottom, 12)
         }
         .font(.geist(size: 12))
         .frame(width: Self.size.width, height: Self.size.height)
@@ -54,14 +57,13 @@ struct FloatingView: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .overlay(WindowDragRegion())
-            Button(action: capture) {
-                Image(systemName: "viewfinder").font(.geist(size: 11, weight: .regular))
-                    .foregroundStyle(.secondary).frame(width: 26, height: 24)
-            }.buttonStyle(QuietButtonStyle()).help("Capture a palette · ⌘⇧A").accessibilityLabel("Capture screen palette")
-                .disabled(store.isSampling || store.readOnly)
+            Button(action: showLibrary) {
+                Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 11))
+                    .foregroundStyle(.secondary).frame(width: 28, height: 28)
+            }.buttonStyle(QuietButtonStyle()).help("Open color library · ⌘1").accessibilityLabel("Expand library")
             Button(action: close) {
                 Image(systemName: "xmark").font(.geist(size: 8, weight: .medium))
-                    .foregroundStyle(.tertiary).frame(width: 20, height: 24)
+                    .foregroundStyle(.tertiary).frame(width: 24, height: 28)
             }.buttonStyle(QuietButtonStyle()).help("Hide picker · ⌘W").accessibilityLabel("Hide picker")
         }.padding(.leading, 17).padding(.trailing, 11)
     }
@@ -75,7 +77,7 @@ struct FloatingView: View {
                     .foregroundStyle(wellInk.opacity(hoveringWell ? 0.85 : 0.55))
                     .allowsHitTesting(false)
             }
-            .overlay(PickSurface(action: pick, enabled: !store.isSampling && !store.readOnly))
+            .overlay(PickSurface(action: pick, enabled: canCollect))
             .onHover { hoveringWell = $0 }
             .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: hoveringWell)
             .help("Press, drag, and release to pick · ⌃⌥C · Hold Shift for more")
@@ -136,23 +138,49 @@ struct FloatingView: View {
     }
 
     private var history: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 0) {
             if store.recent.isEmpty {
-                Text("Drag the color well to pick")
+                Text("Recent colors")
                     .font(.geist(size: 10)).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ForEach(store.recent.prefix(6)) { record in
                     RecentSwatch(store: store, record: record, selected: current?.id == record.id)
+                        .frame(maxWidth: .infinity)
                 }
-                Spacer(minLength: 0)
             }
-            Button(action: showLibrary) {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.geist(size: 10, weight: .regular)).foregroundStyle(.secondary)
-                    .frame(width: 24, height: 28)
-            }.buttonStyle(QuietButtonStyle()).help("Open color library · ⌘1").accessibilityLabel("Expand library")
         }
+    }
+
+    private var actions: some View {
+        HStack(spacing: 6) {
+            CompactAction(title: "Pick color", symbol: "eyedropper", shortcut: "⌃⌥C") { pick(false) }
+            CompactAction(title: "Capture area", symbol: "viewfinder", shortcut: "⌘⇧A", action: capture)
+            CompactAction(title: "Open image", symbol: "photo", shortcut: "⌘O", action: openImage)
+        }.disabled(!canCollect)
+    }
+}
+
+private struct CompactAction: View {
+    let title: String
+    let symbol: String
+    let shortcut: String
+    let action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: symbol).font(.system(size: 15, weight: .regular))
+                Text(title).font(.geist(size: 10, weight: .medium)).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity).frame(height: 46)
+            .background(Color(nsColor: .controlBackgroundColor).opacity(hovered ? 0.95 : 0.65),
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .modifier(ShadowBorder(radius: 8, hovered: hovered))
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }.buttonStyle(QuietButtonStyle()).onHover { hovered = $0 }
+            .accessibilityLabel(title).help("\(title) · \(shortcut)")
     }
 }
 

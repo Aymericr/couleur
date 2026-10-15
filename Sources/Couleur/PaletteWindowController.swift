@@ -133,6 +133,7 @@ final class PaletteWindowController: NSWindowController, NSWindowDelegate {
         let root = FloatingView(store: store,
             pick: { [weak self] pressed in self?.pickColor(initiatedByPress: pressed) },
             capture: { [weak self] in self?.capturePalette() },
+            openImage: { [weak self] in self?.showLibrary { [weak self] in self?.store.importImage() } },
             showLibrary: { [weak self] in self?.showLibrary() },
             close: { [weak self] in self?.panel.performClose(nil) },
             togglePin: { [weak self] in self?.togglePin() }, isPinned: pinned)

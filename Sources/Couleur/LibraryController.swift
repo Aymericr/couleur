@@ -4,7 +4,7 @@ import SwiftUI
 
 /// Two destinations, one canvas, and an optional inspector.
 @MainActor
-final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegate, NSMenuDelegate {
+final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegate {
     private weak var window: NSWindow?
     private let store: ColorStore
     private let pick: () -> Void
@@ -16,7 +16,7 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
     private let searchItem = NSSearchToolbarItem(itemIdentifier: .colorSearch)
     private let libraryToolbar = NSToolbar(identifier: "CouleurLibraryToolbar")
     private let destinations = NSSegmentedControl(labels: ["Colors", "Captures"], trackingMode: .selectOne, target: nil, action: nil)
-    private var addItem: NSToolbarItem?
+    private var utilityButtons: [NSToolbarItem.Identifier: NSButton] = [:]
     private var lastColorFilter: LibraryFilter = .all
 
     init(window: NSWindow, store: ColorStore, captureManager: RegionCapture, pick: @escaping () -> Void,
@@ -34,6 +34,8 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
         inspector.maximumThickness = 300
         inspector.preferredThicknessFraction = 0.26
         inspector.isCollapsed = true
+        // Keep the utility actions across the whole window when details open.
+        inspector.allowsFullHeightLayout = false
         split.splitView.isVertical = true
         split.splitView.dividerStyle = .thin
         split.addSplitViewItem(content)
@@ -90,7 +92,7 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
             window?.title = store.filter == .all ? "All Colors" : store.filterTitle
         }
         if searchItem.searchField.stringValue != store.search { searchItem.searchField.stringValue = store.search }
-        addItem?.isEnabled = !store.isSampling && !store.isExtracting && !store.readOnly
+        utilityButtons.values.forEach { $0.isEnabled = !store.isSampling && !store.isExtracting && !store.readOnly }
     }
 
     func controlTextDidChange(_ obj: Notification) {
@@ -100,7 +102,7 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.colorDestinations, .flexibleSpace, .colorSearch, .colorAdd, .colorCompact]
+        [.colorDestinations, .flexibleSpace, .colorPick, .colorCapture, .colorImport, .colorSearch, .colorCompact]
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         toolbarDefaultItemIdentifiers(toolbar)
@@ -118,33 +120,20 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
             item.toolTip = "Return to compact picker · ⌘2"
             item.visibilityPriority = .high
             return item
-        case .colorAdd:
-            let item = NSMenuToolbarItem(itemIdentifier: id)
-            item.label = "Add"
-            item.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "Add a color or image")
-            item.toolTip = "Add a color or image"
-            item.autovalidates = false
-            let menu = NSMenu()
-            menu.delegate = self
-            menu.autoenablesItems = false
-            for (title, symbol, action) in [("Pick color", "eyedropper", #selector(pickColor)),
-                                          ("Capture area", "viewfinder", #selector(capturePalette)),
-                                          ("Open image…", "photo", #selector(importImage))] {
-                let option = NSMenuItem(title: title, action: action, keyEquivalent: "")
-                option.target = self
-                option.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
-                menu.addItem(option)
-            }
-            item.menu = menu
-            addItem = item
-            return item
+        case .colorPick:
+            return collectionButton(id, "Pick color", symbol: "eyedropper", shortcut: "⌃⌥C", action: #selector(pickColor))
+        case .colorCapture:
+            return collectionButton(id, "Capture area", symbol: "viewfinder", shortcut: "⌘⇧A", action: #selector(capturePalette))
+        case .colorImport:
+            return collectionButton(id, "Open image", symbol: "photo", shortcut: "⌘O", action: #selector(importImage))
         case .colorSearch:
             searchItem.label = "Search Colors"
             searchItem.searchField.placeholderString = "Search colors"
             searchItem.searchField.delegate = self
             searchItem.searchField.font = AppTypography.native(size: 12)
             searchItem.searchField.sendsSearchStringImmediately = true
-            searchItem.preferredWidthForSearchField = 180
+            searchItem.preferredWidthForSearchField = 140
+            searchItem.visibilityPriority = .low
             searchItem.searchField.setAccessibilityLabel("Search colors")
             return searchItem
         default: return nil
@@ -162,10 +151,25 @@ final class LibraryController: NSObject, NSToolbarDelegate, NSSearchFieldDelegat
         return item
     }
 
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        for item in menu.items {
-            item.isEnabled = !store.isSampling && !store.isExtracting && !store.readOnly
-        }
+    private func collectionButton(_ id: NSToolbarItem.Identifier, _ title: String, symbol: String,
+                                  shortcut: String, action: Selector) -> NSToolbarItem {
+        let item = NSToolbarItem(itemIdentifier: id)
+        let control = NSButton(title: title, target: self, action: action)
+        control.bezelStyle = .texturedRounded
+        control.font = AppTypography.native(size: 12, weight: .medium)
+        control.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        control.imagePosition = .imageLeading
+        control.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        control.toolTip = "\(title) · \(shortcut)"
+        control.setAccessibilityLabel(title)
+        control.isEnabled = !store.isSampling && !store.isExtracting && !store.readOnly
+        control.heightAnchor.constraint(equalToConstant: 30).isActive = true
+        item.label = title
+        item.view = control
+        item.autovalidates = false
+        item.visibilityPriority = .high
+        utilityButtons[id] = control
+        return item
     }
     @objc private func changeDestination() {
         store.search = ""
@@ -208,7 +212,9 @@ private final class InspectorHost: NSViewController {
 
 private extension NSToolbarItem.Identifier {
     static let colorDestinations = Self("ColorDestinations")
-    static let colorAdd = Self("ColorAdd")
+    static let colorPick = Self("ColorPick")
+    static let colorCapture = Self("ColorCapture")
+    static let colorImport = Self("ColorImport")
     static let colorSearch = Self("ColorSearch")
     static let colorCompact = Self("ColorCompact")
 }

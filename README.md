@@ -6,18 +6,18 @@ A personal replacement for [Couleurs](https://couleursapp.com/), inspired by its
 
 ## Everyday use
 
-The app opens as a **256 × 158 pt floating palette**: a small color well beside a prominent code, with six recent colors below. The surface follows your Mac’s light or dark appearance. On macOS 26 and later it uses native Liquid Glass, with a material fallback on older systems and solid surfaces for Reduce Transparency or Increase Contrast. Swatch colors stay unfiltered.
+The app opens as a **256 × 204 pt floating palette**: a small color well beside a prominent code, six recent colors, and three direct actions: **Pick color**, **Capture area**, and **Open image**. The surface follows your Mac’s light or dark appearance. On macOS 26 and later it uses native Liquid Glass, with a material fallback on older systems and solid surfaces for Reduce Transparency or Increase Contrast. Swatch colors stay unfiltered.
 
 The interface uses **Geist**, color codes use **Geist Mono**, and the compact wordmark uses **Geist Pixel**. The fonts are bundled locally under the [SIL Open Font License](Resources/Fonts/OFL.txt); no font installation or download is needed at runtime. Continuous corners, fine neutral edges, and soft contact shadows keep surfaces legible in both appearances.
 
 - **Press the color well, hold, drag anywhere on screen, and release** to save and copy the color.
-- Alternatively, click the eyedropper, then click a color, or press **⌃⌥C** from any app.
+- Alternatively, click **Pick color**, then click a color, or press **⌃⌥C** from any app.
 - **Hold Shift when selecting** to keep the sampler open and collect more colors. Release Shift for the final selection, or press **Esc** to finish. Each selected color gets its own history entry; the latest is copied.
 - **Click the color code** to copy it again. Click a recent swatch to select and copy it.
 - Hover a recent swatch or library color for its small **×**. Removal is immediate; **⌘Z** restores it with its name, notes, and source. **⌘⇧Z** redoes the removal.
 - Use the **format menu** beside the code to change its encoding. **Keep on top** is in the same menu.
-- The **expand button at the bottom right** unfolds the same window into the full library. The **Compact Picker** toolbar button (or **⌘2**) folds it back to its original position. Search, selection, and browsing state are preserved. The transition respects **Reduce Motion**.
-- The **capture icon in the header** (or **⌘⇧A** while Couleur is active) lets you drag a screen area and explore its palette.
+- The **expand button in the header** unfolds the same window into the full library. The **Compact Picker** toolbar button (or **⌘2**) folds it back to its original position. Search, selection, and browsing state are preserved. The transition respects **Reduce Motion**.
+- **Capture area** (or **⌘⇧A** while Couleur is active) lets you drag a screen area and explore its palette. **Open image** (or **⌘O**) opens an image file. All three actions also appear directly in the expanded library's toolbar, including with details open. Search folds to a magnifying-glass button when space is tight; **⌘F** always opens it.
 
 Automatic copying and keeping the picker on top are enabled initially. The floating window can accompany other apps and full-screen Spaces. Drag the quiet header to move it; the small close button hides it.
 
@@ -47,7 +47,7 @@ Screen picking uses a compact circular loupe with a fine grid and an outlined ce
 
 ## Screen palettes
 
-Choose **Capture Screen Palette** from the File or menu-bar menu, the compact header, or **+ → Capture area** in the library. Drag a rectangle using macOS's screenshot selector; **Esc** cancels. Couleur hides its window during selection, then expands into the result:
+Choose **Capture area** in the compact picker or library toolbar, or **Capture Screen Palette** from the File or menu-bar menu. Drag a rectangle using macOS's screenshot selector; **Esc** cancels. Couleur hides its window during selection, then expands into the result:
 
 - Up to **five dominant colors**, ordered by area, with approximate percentages and a proportion strip.
 - **Suggested color roles**: background, surface, foreground, and accents for flat designs; main colors, accents, shadows, and highlights for textured images. Click a role to copy and save its color with an editable name and role metadata.
@@ -56,7 +56,7 @@ Choose **Capture Screen Palette** from the File or menu-bar menu, the compact he
 - A large image canvas with up to **12 movable color points**. Five representative points are suggested initially. **Click to add**, drag a numbered point to refine it, or use **+ / −** beside Your palette. The small pixel loupe appears during dragging. **Esc** cancels an unfinished drag.
 - Arrow keys move a selected point by one original image pixel; **Shift** moves ten. The palette buttons also support keyboard focus and arrow refinement. **⌘Z / ⌘⇧Z** undo and redo palette edits.
 - Your palette saves with the image, including exact pixel coordinates. Moving a point updates the palette on release; it does not fill the color history with intermediate samples. Click a palette swatch to copy and keep that color, **Copy palette** for every color in the selected format, or the folder button to create a collection.
-- Choose **+ → Open image…** (or **File → Open Image…**, **⌘O**) to explore a local photo or design. Image orientation is normalized, and a PNG copy is kept locally.
+- Choose **Open image** (or **File → Open Image…**, **⌘O**) to explore a local photo or design. Image orientation is normalized, and a PNG copy is kept locally.
 - Click a shade to **copy and save it** in the current copy format. A checkmark confirms the copy. Repeated clicks on the same color in that capture reuse its history entry.
 - Expand **Explore more colors** for suggested roles, gradients, dominant colors, and the full shade catalog. **Save colors…** inside that section saves those groups as a collection. Names and notes on already-picked, unfiled colors are preserved.
 - Every successful capture is **saved automatically**, including the original image, all grouped shades, roles, gradients, capture date, and available source metadata. Open it again from **Captures**, including after restarting the app. A capture stays together as one palette; individual colors enter All Colors when you choose to keep them.
