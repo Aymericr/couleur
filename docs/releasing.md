@@ -24,6 +24,26 @@ COULEUR_NOTARY_PROFILE=Couleur ./scripts/package-release.sh
 
 Do not put Apple passwords, P8/P12 files, or the Sparkle private key in the repository. Distribution never falls back to ad-hoc signing. Ordinary `scripts/build.sh` builds remain usable for local development and do not enable the public updater.
 
+### Personal Apple account
+
+The personal release certificate is **Developer ID Application: Aymeric Rabot (BU849QPYLP)**. Signing and notarization are separate: this certificate signs the app, while a login for the same personal team submits it to Apple. Selecting a certificate does not switch the account used for notarization.
+
+To configure personal notarization without an API key, create an app-specific password at [Apple Account](https://account.apple.com/), then run this in your own Terminal with the Apple ID for your personal developer membership:
+
+```sh
+xcrun notarytool store-credentials Couleur \
+  --apple-id YOUR_PERSONAL_APPLE_ID --team-id BU849QPYLP
+```
+
+Enter the app-specific password at the secure prompt. Do not put it in the command, chat, or shell history. The command validates and saves it in the local Keychain. Then the release pipeline can run:
+
+```sh
+COULEUR_SIGN_IDENTITY='Developer ID Application: Aymeric Rabot (BU849QPYLP)' \
+COULEUR_NOTARY_PROFILE=Couleur ./scripts/package-release.sh
+```
+
+A failed credentials preflight does not reserve the release output directory. This local flow needs no credential export to GitHub. The hosted workflow requires the separate environment setup below.
+
 For hosted releases, create the GitHub Actions **release** environment and add these secrets there:
 
 | Secret | Value |

@@ -220,8 +220,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         window.addItem(item("Color Library", #selector(showLibrary), key: "1"))
         window.addItem(item("Floating Picker", #selector(showFloating), key: "2"))
         let windowRoot = NSMenuItem(); windowRoot.submenu = window; main.addItem(windowRoot)
+        let help = NSMenu(title: "Help")
+        help.addItem(item("Couleur Website", #selector(openWebsite)))
+        help.addItem(item("Privacy & Legal", #selector(openPrivacy)))
+        help.addItem(item("License", #selector(openLicense)))
+        let helpRoot = NSMenuItem(); helpRoot.submenu = help; main.addItem(helpRoot)
         NSApp.mainMenu = main
         NSApp.windowsMenu = window
+        NSApp.helpMenu = help
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "eyedropper.halffull", accessibilityDescription: "Couleur")
@@ -244,5 +250,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         ]
         if let icon = NSApp.applicationIconImage { options[.applicationIcon] = icon }
         NSApp.orderFrontStandardAboutPanel(options: options)
+    }
+
+    @objc private func openWebsite() {
+        NSWorkspace.shared.open(URL(string: "https://www.aymeric.dev/couleur")!)
+    }
+
+    @objc private func openPrivacy() {
+        NSWorkspace.shared.open(URL(string: "https://www.aymeric.dev/legal")!)
+    }
+
+    @objc private func openLicense() {
+        if let url = Bundle.main.url(forResource: "LICENSE", withExtension: "txt") {
+            NSWorkspace.shared.open(url)
+        }
     }
 }

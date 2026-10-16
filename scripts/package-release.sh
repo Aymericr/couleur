@@ -31,8 +31,9 @@ else
   expected_key=$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' Resources/Info.plist)
   [[ "$actual_key" == "$expected_key" ]] || { echo 'Sparkle Keychain key does not match this app.' >&2; exit 1; }
 fi
-mkdir -p "$dist" build/notarization
+mkdir -p build/notarization
 xcrun notarytool history "${notary_args[@]}" --output-format json > build/notarization/preflight.json
+mkdir -p "$dist"
 swift test
 ./scripts/build.sh release universal
 app="$PWD/build/Couleur.app"
