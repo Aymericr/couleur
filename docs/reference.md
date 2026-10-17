@@ -124,7 +124,7 @@ The debug preview has a separate bundle ID, preferences, and library in `build/p
 
 For permission-free visual checks of the loupe, run `./scripts/preview.sh light --loupe /path/to/image.png`, open the preview, and start picking. This debug-only mode samples the fixture image into the isolated preview library.
 
-Local builds are signed for development and do not start the public updater. Public distribution uses a universal, Developer ID signed and notarized DMG, signed Sparkle updates, and a generated Homebrew cask. See [release setup and automation](releasing.md). The first public download is not available until that pipeline has completed.
+Local builds are signed for development and do not start the public updater. [Download the public release](https://aymeric.dev/couleur) for Apple silicon and Intel. It includes a Developer ID signed and notarized DMG, signed Sparkle updates, and a generated Homebrew cask. See [release setup and automation](releasing.md).
 
 The app icon uses the gradient artwork and single pearl `#` in [`Resources/AppIcon.icon`](../Resources/AppIcon.icon). The composition fills the system icon shape with the artwork, preserving its color and dithering without an extra background plate. Its compiled asset catalog and ICNS fallback are checked in, so normal builds need no icon tooling. To regenerate them with Xcode 26 or later:
 

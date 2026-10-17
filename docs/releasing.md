@@ -8,7 +8,7 @@ Couleur is free, with public MIT-licensed source. The native app and releases li
 
 `scripts/publish-release.sh VERSION` creates a **draft**, uploads the verified artifacts, downloads them again, and checks their hashes. Add `--publish` to make that draft public. An already-published version cannot be overwritten. The GitHub **Release** workflow combines these steps; leave its Publish checkbox off to review a draft first. Publishing also updates `Casks/couleur.rb` on main.
 
-The website checks public GitHub release metadata every five minutes. It displays a download only when the DMG, update ZIP, appcast, cask, and checksums are present. Homebrew instructions appear when the committed cask matches the release. Before that, the page links to source and says the downloadable release is being prepared. The repositories do not need shared deployment credentials.
+The website checks public GitHub release metadata every five minutes. It displays a download only when the DMG, update ZIP, appcast, cask, and checksums are present. The Homebrew tap uses the committed cask. Before a complete release is available, the page links to source and says the downloadable release is being prepared. The repositories do not need shared deployment credentials.
 
 ## One-time credentials
 

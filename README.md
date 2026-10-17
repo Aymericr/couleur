@@ -33,9 +33,19 @@ Choose **Capture area** or **Open image**. Click the image to add a color, then 
 
 ### Get started
 
-Requires **macOS 14 or later**. The first signed DMG for Apple silicon and Intel is being prepared. You can [build from source](docs/reference.md#build-from-source) in the meantime.
+Get Couleur at **[aymeric.dev/couleur](https://aymeric.dev/couleur)**. Open the DMG, drag **Couleur** into **Applications**, and open it. Works on Apple silicon and Intel Macs running **macOS 14 or later**.
 
 For screen picking, Couleur guides you to **System Settings → Privacy & Security → Screen Recording**. Turn on Couleur, then return to the app. It never records audio.
+
+<details>
+<summary>Install with Homebrew</summary>
+
+```sh
+brew tap Aymericr/couleur https://github.com/Aymericr/couleur
+brew install --cask Aymericr/couleur/couleur
+```
+
+</details>
 
 | Shortcut | Action |
 | --- | --- |
