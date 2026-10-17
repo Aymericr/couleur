@@ -30,6 +30,7 @@ cask "couleur" do
 
   auto_updates true
   depends_on macos: :sonoma
+
   app "Couleur.app"
 end
 ''')
